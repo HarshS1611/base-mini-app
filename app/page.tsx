@@ -1,81 +1,130 @@
-"use client";
-import { useEffect } from "react";
-import Image from "next/image";
-import { Wallet } from "@coinbase/onchainkit/wallet";
-import { useMiniKit } from "@coinbase/onchainkit/minikit";
-// import { useQuickAuth } from "@coinbase/onchainkit/minikit";
-import styles from "./page.module.css";
+'use client';
+import { useState } from 'react';
+import WalletConnect from '@/components/WalletConnect';
+import GaslessPayment from '@/components/GaslessPayment';
+import OnrampFlow from '@/components/OnrampFlow';
+import OfframpFlow from '@/components/OfframpFlow';
+import ReceiverChoice from '@/components/ReceiverChoice';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Send, ArrowDownToLine, ArrowUpFromLine, Zap, Users } from 'lucide-react';
 
 export default function Home() {
-  // If you need to verify the user's identity, you can use the useQuickAuth hook.
-  // This hook will verify the user's signature and return the user's FID. You can update
-  // this to meet your needs. See the /app/api/auth/route.ts file for more details.
-  // Note: If you don't need to verify the user's identity, you can get their FID and other user data
-  // via `useMiniKit().context?.user`.
-  // const { data, isLoading, error } = useQuickAuth<{
-  //   userFid: string;
-  // }>("/api/auth");
+  const [activeTab, setActiveTab] = useState('send');
+  const [showReceiverChoice, setShowReceiverChoice] = useState(false);
 
-  const { setMiniAppReady, isMiniAppReady } = useMiniKit();
-
-  useEffect(() => {
-    if (!isMiniAppReady) {
-      setMiniAppReady();
+  // Mock receiver choice props
+  const mockReceiverProps = {
+    amount: '100',
+    currency: 'USDC',
+    senderName: 'Alice',
+    transactionHash: '0x1234567890abcdef1234567890abcdef12345678',
+    recipientAddress: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb',
+    onChoiceSelected: (choice: 'crypto' | 'bank') => {
+      console.log('Receiver chose:', choice);
+      setShowReceiverChoice(false);
     }
-  }, [setMiniAppReady, isMiniAppReady]);
+  };
+
+  const tabs = [
+    { id: 'send', label: 'Send', icon: Send },
+    { id: 'deposit', label: 'Deposit', icon: ArrowDownToLine },
+    { id: 'withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
+  ];
+
+  // Show receiver choice simulation
+  if (showReceiverChoice) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
+        <div className="max-w-md mx-auto">
+          <div className="text-center mb-6">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowReceiverChoice(false)}
+              className="mb-4"
+            >
+              ← Back to FlowSend
+            </Button>
+          </div>
+          <ReceiverChoice {...mockReceiverProps} />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className={styles.container}>
-      <header className={styles.headerWrapper}>
-        <Wallet />
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
+      <div className="max-w-md mx-auto">
+        {/* Header */}
+        <div className="text-center mb-6">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <Send className="w-8 h-8 text-blue-600" />
+            <h1 className="text-3xl font-bold text-gray-800">
+              Flow<span className="text-blue-600">Send</span>
+            </h1>
+          </div>
+          <div className="flex items-center justify-center space-x-2 mb-4">
+            <p className="text-gray-600 text-sm">Send money like sending a text</p>
+            <div className="flex items-center space-x-1 text-green-600">
+              <Zap className="w-4 h-4" />
+              <span className="text-xs font-medium">Gas Free</span>
+            </div>
+          </div>
+          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+            Base Sepolia Testnet
+          </Badge>
+        </div>
 
-      <div className={styles.content}>
-        <Image
-          priority
-          src="/sphere.svg"
-          alt="Sphere"
-          width={200}
-          height={200}
-        />
-        <h1 className={styles.title}>MiniKit</h1>
+        {/* Wallet Connection */}
+        <WalletConnect />
 
-        <p>
-          Get started by editing <code>app/page.tsx</code>
-        </p>
-
-        <h2 className={styles.componentsTitle}>Explore Components</h2>
-
-        <ul className={styles.components}>
-          {[
-            {
-              name: "Transaction",
-              url: "https://docs.base.org/onchainkit/transaction/transaction",
-            },
-            {
-              name: "Swap",
-              url: "https://docs.base.org/onchainkit/swap/swap",
-            },
-            {
-              name: "Checkout",
-              url: "https://docs.base.org/onchainkit/checkout/checkout",
-            },
-            {
-              name: "Wallet",
-              url: "https://docs.base.org/onchainkit/wallet/wallet",
-            },
-            {
-              name: "Identity",
-              url: "https://docs.base.org/onchainkit/identity/identity",
-            },
-          ].map((component) => (
-            <li key={component.name}>
-              <a target="_blank" rel="noreferrer" href={component.url}>
-                {component.name}
-              </a>
-            </li>
+        {/* Navigation Tabs */}
+        <div className="flex bg-white rounded-lg p-1 shadow-sm mb-6">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              variant={activeTab === tab.id ? 'default' : 'ghost'}
+              onClick={() => setActiveTab(tab.id)}
+              className="flex-1 flex items-center space-x-2"
+              size="sm"
+            >
+              <tab.icon className="w-4 h-4" />
+              <span className="text-sm">{tab.label}</span>
+            </Button>
           ))}
-        </ul>
+        </div>
+
+        {/* Tab Content */}
+        <div>
+          {activeTab === 'send' && <GaslessPayment />}
+          {activeTab === 'deposit' && <OnrampFlow />}
+          {activeTab === 'withdraw' && <OfframpFlow />}
+        </div>
+
+        {/* Demo Receiver Choice */}
+        <div className="mt-6">
+          <Button 
+            onClick={() => setShowReceiverChoice(true)}
+            variant="outline"
+            className="w-full flex items-center space-x-2"
+          >
+            <Users className="w-4 h-4" />
+            <span>🎭 Simulate Receiver Experience</span>
+          </Button>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8 text-xs text-gray-500">
+          <div className="flex items-center justify-center space-x-2 mb-2">
+            <span>Powered by Base Sepolia</span>
+            <span>•</span>
+            <div className="flex items-center space-x-1">
+              <Zap className="w-3 h-3 text-green-500" />
+              <span>Gasless via Paymaster</span>
+            </div>
+          </div>
+          <p>Built with OnchainKit • Coinbase Onramp/Offramp</p>
+        </div>
       </div>
     </div>
   );
