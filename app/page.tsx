@@ -8,6 +8,9 @@ import ReceiverChoice from '@/components/ReceiverChoice';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Send, ArrowDownToLine, ArrowUpFromLine, Zap, Users } from 'lucide-react';
+import OnRampPartnerCard from '@/components/OnrampFlow';
+import CircleDeposit from '@/components/CircleDeposit';
+import CircleWithdraw from '@/components/CircleWithdraw';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('send');
@@ -98,7 +101,7 @@ export default function Home() {
         <div>
           {activeTab === 'send' && <GaslessPayment />}
           {activeTab === 'deposit' && <OnrampFlow />}
-          {activeTab === 'withdraw' && <OfframpFlow />}
+          {activeTab === 'withdraw' && <CircleWithdraw />}
         </div>
 
         {/* Demo Receiver Choice */}

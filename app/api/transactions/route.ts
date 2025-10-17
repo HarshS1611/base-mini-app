@@ -13,7 +13,6 @@ export async function POST(request: NextRequest) {
       fromAddress, 
       toAddress, 
       amount, 
-      description = 'FlowSend transfer' 
     }: TransactionRequest = await request.json();
 
     if (!fromAddress || !toAddress || !amount) {

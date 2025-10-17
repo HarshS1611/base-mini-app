@@ -1,6 +1,6 @@
 "use client";
 import { ReactNode } from "react";
-import { base, baseSepolia } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import { OnchainKitProvider } from "@coinbase/onchainkit";
 import "@coinbase/onchainkit/styles.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -38,6 +38,7 @@ export function RootProvider({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <OnchainKitProvider
           apiKey={process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY}
+          projectId={process.env.NEXT_PUBLIC_CDP_PROJECT_ID}
           chain={baseSepolia}
           config={{
             appearance: {

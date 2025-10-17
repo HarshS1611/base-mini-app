@@ -1,124 +1,270 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAccount, useBalance } from 'wagmi';
-import { ArrowDownToLine, Loader2, CheckCircle, ExternalLink, AlertCircle, Shield } from 'lucide-react';
-import { CONTRACTS } from '@/lib/utils';
+import { ArrowDownToLine, Loader2, CheckCircle, ExternalLink, AlertCircle } from 'lucide-react';
+import { USDC_CONTRACT_ADDRESS } from '@/lib/constants';
+import {
+  setupOnrampEventListeners,
+  getOnrampBuyUrl
+} from '@coinbase/onchainkit/fund';
+import type { SuccessEventData, OnrampError } from '@coinbase/onchainkit/fund';
+import { generateOnrampURL } from '@/lib/onRamp';
+import { FundCard,fetchOnrampConfig } from '@coinbase/onchainkit/fund';
+
 
 export default function OnrampFlow() {
   const [amount, setAmount] = useState('50');
+  const [onrampUrl, setOnrampUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [isComplete, setIsComplete] = useState(false);
+  const [popupWindow, setPopupWindow] = useState<Window | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | undefined>();
 
   const { address, isConnected } = useAccount();
+
   const { data: usdcBalance, refetch: refetchBalance } = useBalance({
     address,
-    token: CONTRACTS.USDC,
+    token: USDC_CONTRACT_ADDRESS,
   });
 
-  const handleOnramp = async () => {
-    if (!isConnected || !amount || !address) return;
+  // Generate session token and onramp URL when address is available
+  useEffect(() => {
+    if (!address) return;
 
-    setIsLoading(true);
-    setResult(null);
-    setError('');
+    const generateSessionToken = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-    try {
-      // Validate amount
-      const numericAmount = parseFloat(amount);
-      if (isNaN(numericAmount) || numericAmount < 10) {
-        throw new Error('Minimum deposit amount is $10');
-      }
-      if (numericAmount > 1000) {
-        throw new Error('Maximum deposit amount is $1,000');
-      }
+        console.log('🔄 Generating session token for address:', address);
 
-      console.log('🔄 Initiating onramp for:', { amount, address });
-
-      const response = await fetch('/api/onramp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: amount.toString(),
-          userAddress: address,
-          paymentMethod: 'ACH_BANK_ACCOUNT'
-        })
-      });
-
-      const data = await response.json();
-      console.log('📥 Onramp API response:', data);
-
-      if (data.success) {
-        // Open Coinbase onramp in new window with better window settings
-        const onrampWindow = window.open(
-          data.onrampUrl, 
-          'coinbase-onramp',
-          'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes'
-        );
-
-        if (!onrampWindow) {
-          throw new Error('Popup blocked. Please allow popups and try again.');
-        }
-        
-        setResult({
-          success: true,
-          message: `Onramp initiated for ${data.amount} USDC`,
-          onrampUrl: data.onrampUrl,
-          amount: data.amount,
-          paymentMethod: data.paymentMethod,
-          sessionToken: data.sessionToken,
-          redirectUrl: data.redirectUrl
+        // Generate session token via API
+        const response = await fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            addresses: [
+              {
+                address: address,
+                blockchains: ['base'],
+              },
+            ],
+            assets: ['USDC'],
+          }),
         });
 
-        // Monitor window close and refresh balance
-        const checkClosed = setInterval(() => {
-          if (onrampWindow.closed) {
-            clearInterval(checkClosed);
-            console.log('🔄 Onramp window closed, refreshing balance...');
-            setTimeout(() => {
-              refetchBalance();
-            }, 2000);
-          }
-        }, 1000);
+        const data = await response.json();
 
-        // Auto-refresh balance after 30 seconds
+        setSessionToken(data.token || null);
+
+        if (!response.ok || !data) {
+          console.error('❌ Session token generation failed:', data);
+          throw new Error(data.error || 'Failed to generate session token');
+        }
+
+        const { token } = data;
+
+        if (!token) {
+          throw new Error('No token received from API');
+        }
+
+        console.log('✅ Session token generated successfully');
+
+        // Generate onramp URL using OnchainKit
+        const url = generateOnrampURL({
+          sessionToken: token,
+          presetFiatAmount: parseFloat(amount) || 50,
+          fiatCurrency: 'USD',
+          // Optional parameters
+          defaultNetwork: 'base',
+          defaultAsset: 'USDC',
+        });
+
+        setOnrampUrl(url);
+        console.log('✅ Onramp URL generated');
+      } catch (err) {
+        console.error('❌ Onramp setup error:', err);
+        setError(
+          err instanceof Error ? err.message : 'Failed to setup onramp'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    generateSessionToken();
+  }, [address, amount]);
+
+  // Setup event listeners for onramp events
+  useEffect(() => {
+    if (!onrampUrl) return;
+
+    console.log('👂 Setting up onramp event listeners');
+
+    const unsubscribe = setupOnrampEventListeners({
+      onSuccess: (data?: SuccessEventData) => {
+        console.log('✅ Onramp purchase successful:', data);
+        setIsComplete(true);
+
+        // Close popup window
+        if (popupWindow && !popupWindow.closed) {
+          popupWindow.close();
+        }
+
+        // Refetch balance after successful purchase
         setTimeout(() => {
           refetchBalance();
-        }, 30000);
-      } else {
-        throw new Error(data.error || 'Onramp initialization failed');
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Onramp failed';
-      console.error('❌ Onramp error:', error);
-      setError(errorMessage);
-      setResult({
-        success: false,
-        error: errorMessage
-      });
-    } finally {
-      setIsLoading(false);
+        }, 3000);
+      },
+      onExit: (err?: OnrampError) => {
+        console.log('🚪 Onramp exited:', err);
+
+        if (err) {
+          setError('Transaction was cancelled or failed');
+        }
+
+        // Close popup window
+        if (popupWindow && !popupWindow.closed) {
+          popupWindow.close();
+        }
+      },
+    });
+
+    return () => {
+      console.log('🧹 Cleaning up onramp event listeners');
+      unsubscribe();
+    };
+  }, [onrampUrl, popupWindow, refetchBalance]);
+
+  const openOnrampPopup = () => {
+    if (!onrampUrl) return;
+
+    console.log('🪟 Opening onramp popup');
+
+    const popup = window.open(
+      onrampUrl,
+      'coinbase-onramp',
+      'width=500,height=700,scrollbars=yes,resizable=yes,status=yes,location=yes,toolbar=no,menubar=no'
+    );
+
+    if (popup) {
+      setPopupWindow(popup);
+    } else {
+      setError('Popup blocked. Please allow popups for this site.');
     }
   };
 
   const currentBalance = parseFloat(usdcBalance?.formatted || '0');
-  const numericAmount = parseFloat(amount || '0');
 
+  // Not connected state
+  if (!isConnected) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center space-x-2 mb-4">
+          <ArrowDownToLine className="w-5 h-5 text-blue-500" />
+          <h3 className="text-lg font-semibold">Deposit USDC (Onramp)</h3>
+          <Badge variant="outline">USD → USDC</Badge>
+        </div>
+
+        <Card className="p-4 bg-yellow-50 border-yellow-200">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-yellow-600" />
+            <p className="text-sm text-yellow-800">
+              Please connect your wallet to deposit USDC.
+            </p>
+          </div>
+        </Card>
+      </Card>
+    );
+  }
+
+  // Complete state
+  if (isComplete) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center space-x-2 mb-4">
+          <ArrowDownToLine className="w-5 h-5 text-blue-500" />
+          <h3 className="text-lg font-semibold">Deposit USDC (Onramp)</h3>
+          <Badge variant="outline">USD → USDC</Badge>
+        </div>
+
+        <Card className="p-6 bg-green-50 border-green-200 text-center">
+          <CheckCircle className="w-12 h-12 mx-auto mb-4 text-green-600" />
+          <p className="text-lg font-semibold text-green-800 mb-2">
+            Purchase Complete! 🎉
+          </p>
+          <p className="text-sm text-green-700 mb-4">
+            Your transaction has been processed successfully. USDC should appear in your wallet shortly.
+          </p>
+          <Button
+            onClick={() => {
+              setIsComplete(false);
+              setOnrampUrl(null);
+            }}
+            className="w-full"
+          >
+            Buy More USDC
+          </Button>
+        </Card>
+
+        {/* Current Balance */}
+        <div className="mt-4 p-3 bg-blue-50 rounded border">
+          <p className="text-sm text-gray-600">Current USDC Balance</p>
+          <p className="text-xl font-bold text-blue-600">
+            {currentBalance.toFixed(2)} USDC
+          </p>
+        </div>
+      </Card>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center space-x-2 mb-4">
+          <ArrowDownToLine className="w-5 h-5 text-blue-500" />
+          <h3 className="text-lg font-semibold">Deposit USDC (Onramp)</h3>
+          <Badge variant="outline">USD → USDC</Badge>
+        </div>
+
+        <Card className="p-4 bg-red-50 border-red-200">
+          <div className="flex items-start space-x-2">
+            <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-red-800">Error</p>
+              <p className="text-xs text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        </Card>
+
+        <Button
+          onClick={() => {
+            setError(null);
+            setOnrampUrl(null);
+            window.location.reload();
+          }}
+          className="w-full mt-4"
+          variant="destructive"
+        >
+          Retry
+        </Button>
+      </Card>
+    );
+  }
+
+  // Main onramp UI
   return (
     <Card className="p-6">
       <div className="flex items-center space-x-2 mb-4">
         <ArrowDownToLine className="w-5 h-5 text-blue-500" />
         <h3 className="text-lg font-semibold">Deposit USDC (Onramp)</h3>
         <Badge variant="outline">USD → USDC</Badge>
-        <Badge variant="secondary" className="bg-green-100 text-green-800">
-          <Shield className="w-3 h-3 mr-1" />
-          Secure
-        </Badge>
       </div>
 
       <div className="space-y-4">
@@ -140,146 +286,71 @@ export default function OnrampFlow() {
               type="number"
               placeholder="50"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setOnrampUrl(null); // Reset URL when amount changes
+              }}
               className="pl-8"
               disabled={isLoading}
               min="10"
               max="1000"
-              step="1"
             />
           </div>
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">
-              Will receive ~{amount} USDC on Base Sepolia
-            </span>
-            <span className="text-gray-400">
-              Min: $10 • Max: $1,000
-            </span>
-          </div>
-          
-          {/* Amount validation */}
-          {numericAmount > 0 && numericAmount < 10 && (
-            <p className="text-xs text-red-600">Minimum deposit is $10</p>
-          )}
-          {numericAmount > 1000 && (
-            <p className="text-xs text-red-600">Maximum deposit is $1,000</p>
-          )}
+          <p className="text-xs text-gray-500">
+            Will receive ~{amount} USDC on Base Sepolia
+          </p>
         </div>
 
         {/* Payment Method Info */}
         <div className="p-3 bg-gray-50 rounded border">
           <p className="text-sm font-medium">Payment Method</p>
-          <p className="text-xs text-gray-600">ACH Bank Transfer (US Bank Account)</p>
+          <p className="text-xs text-gray-600">Coinbase Onramp - Multiple options available</p>
           <div className="flex items-center space-x-4 text-xs text-gray-500 mt-2">
-            <span>✓ Free transfer</span>
-            <span>✓ 1-3 business days</span>
-            <span>✓ Up to $25,000/day</span>
+            <span>✓ Bank Transfer</span>
+            <span>✓ Debit Card</span>
+            <span>✓ Apple Pay</span>
           </div>
         </div>
 
-        {/* Connection Warning */}
-        {!isConnected && (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Please connect your wallet to deposit USDC.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
         {/* Onramp Button */}
-        <Button 
-          onClick={handleOnramp}
-          disabled={
-            !isConnected || 
-            !amount || 
-            isLoading || 
-            numericAmount < 10 || 
-            numericAmount > 1000
-          }
+        <Button
+          onClick={openOnrampPopup}
+          disabled={isLoading || !onrampUrl || !isConnected}
           className="w-full"
           size="lg"
         >
           {isLoading ? (
             <div className="flex items-center space-x-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Generating secure session...</span>
+              <span>Generating Secure Session...</span>
             </div>
           ) : (
             <div className="flex items-center space-x-2">
               <ArrowDownToLine className="w-4 h-4" />
-              <span>Deposit ${amount} via Bank Transfer</span>
+              <span>Buy ${amount} USDC</span>
             </div>
           )}
+
         </Button>
 
-        {/* Result */}
-        {result && (
-          <Card className={`p-4 ${result.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-            <div className="flex items-start space-x-3">
-              {result.success ? (
-                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-              )}
-              <div className="flex-1">
-                <p className={`font-medium ${result.success ? 'text-green-800' : 'text-red-800'}`}>
-                  {result.success ? 'Secure Onramp Window Opened!' : 'Onramp Failed'}
-                </p>
-                <p className={`text-sm mt-1 ${result.success ? 'text-green-700' : 'text-red-700'}`}>
-                  {result.success 
-                    ? `Complete your ${result.amount} USDC purchase in the secure Coinbase window. Funds will appear in your wallet once confirmed.`
-                    : result.error
-                  }
-                </p>
-                
-                {result.success && (
-                  <div className="mt-2 space-y-1 text-xs text-green-600">
-                    {result.sessionToken && (
-                      <div className="flex items-center space-x-1">
-                        <Shield className="w-3 h-3" />
-                        <span>Secure session token generated</span>
-                      </div>
-                    )}
-                    <div>Redirect URL: {result.redirectUrl}</div>
-                  </div>
-                )}
-
-                {result.success && result.onrampUrl && (
-                  <a 
-                    href={result.onrampUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 underline mt-2"
-                  >
-                    <span>Reopen Coinbase Window</span>
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
+        <FundCard
+          sessionToken={sessionToken}
+          assetSymbol="ETH"
+          country="US"
+          currency="USD"
+        />;
 
         {/* Info */}
         <div className="p-3 bg-blue-50 rounded border">
           <p className="text-xs text-blue-700">
-            🏦 <strong>Secure & Private:</strong> Powered by Coinbase with session token security. Your bank details are encrypted and never stored by FlowSend.
+            🏦 <strong>Secure & Fast:</strong> Powered by Coinbase Onramp with OnchainKit. Session tokens ensure your transaction is secure.
           </p>
         </div>
 
-        {/* Additional Info for Testnet */}
+        {/* Testnet Notice */}
         <div className="p-3 bg-yellow-50 rounded border">
           <p className="text-xs text-yellow-700">
-            ⚠️ <strong>Base Sepolia Testnet:</strong> This is a test environment. Real money will not be charged, but you may need to complete KYC for testing purposes.
+            🧪 <strong>Base Sepolia Testnet:</strong> This is a test environment. You may need to complete KYC for testing purposes.
           </p>
         </div>
       </div>
