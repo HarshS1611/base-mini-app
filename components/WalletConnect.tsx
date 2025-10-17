@@ -17,7 +17,9 @@ export default function WalletConnect() {
   });
 
 
+
   const { roundedBalance: ethBalance } = useGetETHBalance(address);
+
 
   return (
     <Card className="p-4 mb-6">

@@ -5,211 +5,198 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAccount, useBalance } from 'wagmi';
+import { parseUnits, encodeFunctionData, numberToHex } from 'viem';
+import type { Address } from 'viem';
+import { Zap, Shield, ExternalLink, AlertCircle, Loader2, CheckCircle, Send } from 'lucide-react';
+import { useBaseAccount } from '@/lib/hooks/useBaseAccount';
+import { usePaymasterCapabilities } from '@/lib/hooks/usePaymasterCapabilities';
 import { 
-  useAccount, 
-  useBalance, 
-  useSendTransaction,
-  useWaitForTransactionReceipt,
-} from 'wagmi';
-import { parseUnits, encodeFunctionData } from 'viem';
-import { Send, Loader2, CheckCircle, AlertCircle, Zap, ExternalLink, Shield } from 'lucide-react';
-import { CONTRACTS, DEMO_ADDRESSES, formatAddress } from '@/lib/utils';
-import { paymasterService } from '@/lib/paymaster';
-
-// ERC20 ABI
-const ERC20_ABI = [
-  {
-    name: 'transfer',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' }
-    ],
-    outputs: [{ name: '', type: 'bool' }]
-  }
-] as const;
+  BASE_SEPOLIA_CHAIN_ID, 
+  USDC_CONTRACT_ADDRESS, 
+  ERC20_ABI, 
+  DEMO_ADDRESSES,
+  formatAddress 
+} from '@/lib/constants';
 
 export default function GaslessPayment() {
-  const [amount, setAmount] = useState('1');
-  const [recipient, setRecipient] = useState(DEMO_ADDRESSES.recipient1);
+  const [amount, setAmount] = useState('10');
+  const [recipient, setRecipient] = useState<Address>(DEMO_ADDRESSES.recipient1);
   const [description, setDescription] = useState('');
-  const [status, setStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
-  const [sponsorshipStatus, setSponsorshipStatus] = useState<{
-    checking: boolean;
-    eligible: boolean;
-    reason?: string;
-  }>({ checking: false, eligible: false });
+  const [transactionStatus, setTransactionStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [txHash, setTxHash] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   
+  // Initialize Base Account SDK - get address from getCryptoKeyAccount()
+  const { 
+    provider, 
+    address: fromAddress, // This is cryptoAccount?.account?.address
+    isInitialized, 
+    error: baseAccountError 
+  } = useBaseAccount();
+
   const { data: usdcBalance, refetch: refetchBalance } = useBalance({
-    address,
-    token: CONTRACTS.USDC,
+    address: fromAddress as Address,
+    token: USDC_CONTRACT_ADDRESS,
   });
 
   const { data: ethBalance } = useBalance({
-    address,
+    address: fromAddress as Address,
   });
 
-  const { sendTransaction, data: hash, error, isPending } = useSendTransaction();
+  // Check if paymaster is supported
+  const { 
+    isSupported: paymasterSupported, 
+    isChecking: checkingPaymaster,
+    error: paymasterError 
+  } = usePaymasterCapabilities(provider, fromAddress, isInitialized);
 
-  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
+  // Log the address from getCryptoKeyAccount
+  useEffect(() => {
+    if (isInitialized && fromAddress) {
+      console.log('✅ Using address from getCryptoKeyAccount():', fromAddress);
+    }
+  }, [isInitialized, fromAddress]);
 
-  // Check paymaster sponsorship eligibility
-  const checkSponsorship = async () => {
-    if (!address || !amount || !recipient) {
-      setSponsorshipStatus({ checking: false, eligible: false });
+  const handleSendSponsoredTransaction = async () => {
+    // Validation - exactly as in official docs
+    if (!fromAddress) {
+      console.error('❌ No account found');
+      setErrorMessage('No account found');
       return;
     }
 
-    setSponsorshipStatus({ checking: true, eligible: false });
+    if (!provider || !amount || !recipient) {
+      console.error('❌ Missing required parameters:', {
+        provider: !!provider,
+        fromAddress,
+        amount,
+        recipient
+      });
+      return;
+    }
+
+    setTransactionStatus('pending');
+    setErrorMessage('');
+    setTxHash('');
 
     try {
-      const numericAmount = parseFloat(amount);
-      if (isNaN(numericAmount) || numericAmount <= 0) {
-        setSponsorshipStatus({
-          checking: false,
-          eligible: false,
-          reason: 'Invalid amount'
-        });
-        return;
+      const amountWei = parseUnits(amount, 6); // USDC has 6 decimals
+
+      // Your Paymaster service URL (use your proxy URL) - exactly as in official docs
+      const paymasterServiceUrl = process.env.NEXT_PUBLIC_PAYMASTER_PROXY_SERVER_URL || 
+                                  process.env.NEXT_PUBLIC_PAYMASTER_URL;
+
+      if (!paymasterServiceUrl) {
+        throw new Error('Paymaster service URL not configured');
       }
 
-      const amountWei = parseUnits(amount, 6);
-      const callData = encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: 'transfer',
-        args: [recipient as `0x${string}`, amountWei],
+      // Prepare the transaction call - exactly as in official docs
+      const calls = [
+        {
+          to: USDC_CONTRACT_ADDRESS,
+          value: '0x0',
+          data: encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: 'transfer',
+            args: [recipient, amountWei]
+          })
+        }
+      ];
+
+      console.log('🚀 Sending sponsored transaction:', {
+        from: fromAddress,
+        to: USDC_CONTRACT_ADDRESS,
+        amount: amount + ' USDC',
+        recipient,
+        paymasterServiceUrl: 'configured'
       });
 
-      console.log('🔍 Checking sponsorship for transaction:', {
-        from: address,
-        to: CONTRACTS.USDC,
-        amount: amountWei.toString(),
-        callData
-      });
-
-      // Check eligibility using paymaster service
-      const isEligible = await paymasterService.isEligibleForSponsorship(
-        address,
-        CONTRACTS.USDC,
-        BigInt(0), // No ETH value for ERC20 transfer
-        callData
-      );
-
-      if (isEligible) {
-        // Double-check with API
-        const paymasterData = await paymasterService.getPaymasterData(
-          address,
-          {
-            to: CONTRACTS.USDC,
-            value: BigInt(0),
-            data: callData
+      // Send the transaction with paymaster capabilities - exactly as in official docs
+      const result = await provider.request({
+        method: 'wallet_sendCalls',
+        params: [{
+          version: '1.0',
+          chainId: numberToHex(BASE_SEPOLIA_CHAIN_ID),
+          from: fromAddress,
+          calls: calls,
+          capabilities: {
+            paymasterService: {
+              url: paymasterServiceUrl
+            }
           }
-        );
-
-        setSponsorshipStatus({
-          checking: false,
-          eligible: paymasterData !== null,
-          reason: paymasterData ? 'Transaction will be sponsored by paymaster' : 'Paymaster declined sponsorship'
-        });
-      } else {
-        setSponsorshipStatus({
-          checking: false,
-          eligible: false,
-          reason: 'Transaction not eligible for sponsorship (check amount limits and contract allowlist)'
-        });
-      }
-    } catch (error) {
-      console.error('❌ Sponsorship check failed:', error);
-      setSponsorshipStatus({
-        checking: false,
-        eligible: false,
-        reason: `Sponsorship check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        }]
       });
-    }
-  };
 
-  // Check sponsorship when parameters change
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (isConnected && address && amount && recipient) {
-        checkSponsorship();
-      }
-    }, 500); // Debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [isConnected, address, amount, recipient]);
-
-  const handleSend = async () => {
-    if (!isConnected || !amount || !recipient || !address) return;
-
-    try {
-      setStatus('pending');
+      console.log('✅ Sponsored transaction sent:', result);
       
-      const amountWei = parseUnits(amount, 6);
-      const callData = encodeFunctionData({
-        abi: ERC20_ABI,
-        functionName: 'transfer',
-        args: [recipient as `0x${string}`, amountWei],
-      });
+      setTxHash(result as string);
+      setTransactionStatus('success');
 
-      console.log('🚀 Sending transaction:', {
-        to: CONTRACTS.USDC,
-        data: callData,
-        sponsored: sponsorshipStatus.eligible
-      });
-
-      // Send transaction (paymaster will be handled automatically by smart wallet if eligible)
-      sendTransaction({
-        to: CONTRACTS.USDC,
-        data: callData,
-        value: BigInt(0),
-      });
-
-    } catch (err) {
-      console.error('❌ Transaction failed:', err);
-      setStatus('error');
-    }
-  };
-
-  // Update status based on transaction state
-  useEffect(() => {
-    if (isConfirmed) {
-      setStatus('success');
-      refetchBalance();
-      // Reset after 5 seconds
+      // Refetch balance after successful transaction
       setTimeout(() => {
-        setStatus('idle');
+        refetchBalance();
+      }, 3000);
+
+      // Reset form after 5 seconds
+      setTimeout(() => {
+        setTransactionStatus('idle');
         setAmount('');
         setDescription('');
-        setSponsorshipStatus({ checking: false, eligible: false });
+        setTxHash('');
       }, 5000);
-    } else if (error) {
-      setStatus('error');
-      setTimeout(() => setStatus('idle'), 3000);
-    }
-  }, [isConfirmed, error, refetchBalance]);
 
-  const isLoading = isPending || isConfirming;
+    } catch (error) {
+      console.error('❌ Sponsored transaction failed:', error);
+      setTransactionStatus('error');
+      setErrorMessage(error instanceof Error ? error.message : 'Transaction failed');
+      
+      setTimeout(() => {
+        setTransactionStatus('idle');
+        setErrorMessage('');
+      }, 5000);
+    }
+  };
+
   const currentBalance = parseFloat(usdcBalance?.formatted || '0');
   const ethBalanceNum = parseFloat(ethBalance?.formatted || '0');
   const requestedAmount = parseFloat(amount || '0');
+
+  const isValidTransaction = 
+    isConnected && 
+    fromAddress && 
+    amount && 
+    recipient && 
+    requestedAmount > 0 && 
+    requestedAmount <= currentBalance &&
+    provider &&
+    isInitialized;
+
+  // Show loading state while initializing
+  if (isConnected && !isInitialized && !baseAccountError) {
+    return (
+      <Card className="p-6">
+        <div className="flex items-center justify-center space-x-3 py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+          <p className="text-gray-600">Initializing Base Account SDK...</p>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6">
       <div className="flex items-center space-x-2 mb-4">
         <Zap className="w-5 h-5 text-green-500" />
         <h3 className="text-lg font-semibold">Gasless USDC Transfer</h3>
-        {sponsorshipStatus.checking ? (
+        {checkingPaymaster ? (
           <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
             <Loader2 className="w-3 h-3 mr-1 animate-spin" />
             Checking...
           </Badge>
-        ) : sponsorshipStatus.eligible ? (
+        ) : paymasterSupported ? (
           <Badge variant="secondary" className="bg-green-100 text-green-800">
             <Shield className="w-3 h-3 mr-1" />
             Gas Sponsored
@@ -222,6 +209,14 @@ export default function GaslessPayment() {
       </div>
 
       <div className="space-y-4">
+        {/* Display the address from getCryptoKeyAccount */}
+        {fromAddress && (
+          <div className="p-3 bg-purple-50 rounded border">
+            <p className="text-xs text-purple-600 mb-1">Smart Wallet Address (from getCryptoKeyAccount)</p>
+            <p className="text-sm font-mono text-purple-800">{fromAddress}</p>
+          </div>
+        )}
+
         {/* Balance Display */}
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 bg-blue-50 rounded border">
@@ -231,72 +226,72 @@ export default function GaslessPayment() {
             </p>
           </div>
           <div className="p-3 bg-gray-50 rounded border">
-            <p className="text-sm text-gray-600">ETH for Gas</p>
+            <p className="text-sm text-gray-600">ETH Balance</p>
             <p className="text-lg font-bold text-gray-600">
               {ethBalanceNum.toFixed(4)} ETH
             </p>
-            {!sponsorshipStatus.eligible && ethBalanceNum < 0.001 && (
-              <p className="text-xs text-red-600 mt-1">Low gas balance!</p>
+            {paymasterSupported && (
+              <p className="text-xs text-green-600 mt-1">⚡ No gas needed!</p>
             )}
           </div>
         </div>
 
-        {/* Sponsorship Status */}
-        {isConnected && address && amount && recipient && (
+        {/* Error Messages */}
+        {baseAccountError && (
+          <Card className="p-3 bg-red-50 border-red-200">
+            <div className="flex items-start space-x-2">
+              <AlertCircle className="w-4 h-4 text-red-600 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-800">Base Account Error</p>
+                <p className="text-xs text-red-700 mt-1">{baseAccountError.message}</p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Paymaster Status */}
+        {isConnected && isInitialized && !checkingPaymaster && (
           <Card className={`p-3 ${
-            sponsorshipStatus.checking ? 'bg-yellow-50 border-yellow-200' :
-            sponsorshipStatus.eligible ? 'bg-green-50 border-green-200' : 
-            'bg-orange-50 border-orange-200'
+            paymasterSupported 
+              ? 'bg-green-50 border-green-200' 
+              : 'bg-orange-50 border-orange-200'
           }`}>
             <div className="flex items-start space-x-2">
-              {sponsorshipStatus.checking ? (
-                <Loader2 className="w-4 h-4 text-yellow-600 animate-spin mt-0.5" />
-              ) : sponsorshipStatus.eligible ? (
+              {paymasterSupported ? (
                 <Shield className="w-4 h-4 text-green-600 mt-0.5" />
               ) : (
                 <AlertCircle className="w-4 h-4 text-orange-600 mt-0.5" />
               )}
               <div>
                 <p className={`text-sm font-medium ${
-                  sponsorshipStatus.checking ? 'text-yellow-800' :
-                  sponsorshipStatus.eligible ? 'text-green-800' : 
-                  'text-orange-800'
+                  paymasterSupported ? 'text-green-800' : 'text-orange-800'
                 }`}>
-                  {sponsorshipStatus.checking && 'Checking paymaster eligibility...'}
-                  {!sponsorshipStatus.checking && sponsorshipStatus.eligible && '✅ Transaction will be gasless'}
-                  {!sponsorshipStatus.checking && !sponsorshipStatus.eligible && '⚠️ Gas fees required'}
+                  {paymasterSupported 
+                    ? '✅ Gasless Transaction Enabled' 
+                    : '⚠️ Paymaster Not Available'
+                  }
                 </p>
-                {sponsorshipStatus.reason && (
-                  <p className={`text-xs mt-1 ${
-                    sponsorshipStatus.eligible ? 'text-green-700' : 'text-orange-700'
-                  }`}>
-                    {sponsorshipStatus.reason}
-                  </p>
-                )}
+                <p className={`text-xs mt-1 ${
+                  paymasterSupported ? 'text-green-700' : 'text-orange-700'
+                }`}>
+                  {paymasterSupported 
+                    ? 'Transaction will be sponsored by Coinbase Paymaster.'
+                    : paymasterError || 'Paymaster service not available.'
+                  }
+                </p>
               </div>
             </div>
           </Card>
         )}
 
-        {/* Low ETH Warning */}
-        {!sponsorshipStatus.eligible && ethBalanceNum < 0.001 && (
-          <Card className="p-3 bg-red-50 border-red-200">
+        {/* Connection Warning */}
+        {!isConnected && (
+          <Card className="p-3 bg-yellow-50 border-yellow-200">
             <div className="flex items-center space-x-2">
-              <AlertCircle className="w-4 h-4 text-red-600" />
-              <div>
-                <p className="text-sm font-medium text-red-800">Insufficient ETH for gas fees</p>
-                <p className="text-xs text-red-700 mt-1">
-                  Get Base Sepolia ETH from: 
-                  <a 
-                    href="https://faucet.quicknode.com/base/sepolia" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="underline ml-1"
-                  >
-                    Base Faucet
-                  </a>
-                </p>
-              </div>
+              <AlertCircle className="w-4 h-4 text-yellow-600" />
+              <p className="text-sm text-yellow-800">
+                Please connect your smart wallet to send USDC
+              </p>
             </div>
           </Card>
         )}
@@ -309,27 +304,29 @@ export default function GaslessPayment() {
             placeholder="10.00"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            disabled={isLoading}
+            disabled={transactionStatus === 'pending'}
             min="0.01"
             max={currentBalance.toString()}
             step="0.01"
           />
-          {requestedAmount > currentBalance && (
-            <p className="text-xs text-red-600">
-              Insufficient balance. You have {currentBalance.toFixed(2)} USDC available.
-            </p>
-          )}
-          {requestedAmount > 1000 && (
-            <p className="text-xs text-orange-600">
-              Amounts over $1,000 may not be eligible for gas sponsorship.
-            </p>
-          )}
+          <div className="flex justify-between text-xs">
+            <span className="text-gray-500">
+              Available: {currentBalance.toFixed(2)} USDC
+            </span>
+            {requestedAmount > currentBalance && (
+              <span className="text-red-600">Insufficient balance</span>
+            )}
+          </div>
         </div>
 
         {/* Recipient Selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Recipient</label>
-          <Select value={recipient} onValueChange={setRecipient} disabled={isLoading}>
+          <Select 
+            value={recipient} 
+            onValueChange={(value) => setRecipient(value as Address)} 
+            disabled={transactionStatus === 'pending'}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Select recipient" />
             </SelectTrigger>
@@ -351,85 +348,80 @@ export default function GaslessPayment() {
             placeholder="What's this for?"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            disabled={isLoading}
+            disabled={transactionStatus === 'pending'}
           />
         </div>
 
         {/* Send Button */}
         <Button 
-          onClick={handleSend}
-          disabled={
-            !isConnected || 
-            !amount || 
-            !recipient || 
-            isLoading || 
-            requestedAmount <= 0 || 
-            requestedAmount > currentBalance ||
-            (!sponsorshipStatus.eligible && ethBalanceNum < 0.001) ||
-            sponsorshipStatus.checking
-          }
+          onClick={handleSendSponsoredTransaction}
+          disabled={!isValidTransaction || transactionStatus === 'pending'}
           className="w-full"
           size="lg"
         >
-          {isLoading ? (
+          {transactionStatus === 'pending' ? (
             <div className="flex items-center space-x-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>
-                {isPending ? 'Confirming...' : 'Processing...'}
-              </span>
+              <span>Processing Transaction...</span>
             </div>
+          ) : !isConnected ? (
+            'Connect Wallet to Send'
+          ) : !isInitialized ? (
+            'Initializing...'
+          ) : !fromAddress ? (
+            'No Account Found'
           ) : (
             <div className="flex items-center space-x-2">
               <Send className="w-4 h-4" />
-              {sponsorshipStatus.eligible && <Zap className="w-4 h-4" />}
+              {paymasterSupported && <Zap className="w-4 h-4" />}
               <span>
-                Send {amount} USDC {sponsorshipStatus.eligible ? '(Gas Free)' : '(Gas Required)'}
+                Send {amount} USDC {paymasterSupported ? '(Gas Free)' : ''}
               </span>
             </div>
           )}
         </Button>
 
-        {/* Status Display */}
-        {status !== 'idle' && (
+        {/* Transaction Status */}
+        {transactionStatus !== 'idle' && (
           <Card className={`p-4 ${
-            status === 'success' ? 'bg-green-50 border-green-200' :
-            status === 'error' ? 'bg-red-50 border-red-200' :
+            transactionStatus === 'success' ? 'bg-green-50 border-green-200' :
+            transactionStatus === 'error' ? 'bg-red-50 border-red-200' :
             'bg-blue-50 border-blue-200'
           }`}>
             <div className="flex items-start space-x-3">
-              {status === 'success' && <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />}
-              {status === 'error' && <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />}
-              {status === 'pending' && <Loader2 className="w-5 h-5 text-blue-500 animate-spin mt-0.5" />}
+              {transactionStatus === 'success' && <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />}
+              {transactionStatus === 'error' && <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />}
+              {transactionStatus === 'pending' && <Loader2 className="w-5 h-5 text-blue-500 animate-spin mt-0.5" />}
               
               <div className="flex-1">
                 <p className={`font-medium ${
-                  status === 'success' ? 'text-green-800' :
-                  status === 'error' ? 'text-red-800' :
+                  transactionStatus === 'success' ? 'text-green-800' :
+                  transactionStatus === 'error' ? 'text-red-800' :
                   'text-blue-800'
                 }`}>
-                  {status === 'success' && (sponsorshipStatus.eligible ? 'Gasless Transaction Successful! ⚡' : 'Transaction Successful!')}
-                  {status === 'error' && 'Transaction Failed'}
-                  {status === 'pending' && (sponsorshipStatus.eligible ? 'Gasless Transaction Processing...' : 'Transaction Processing...')}
+                  {transactionStatus === 'success' && (paymasterSupported ? '✅ Gasless Transaction Successful!' : '✅ Transaction Successful!')}
+                  {transactionStatus === 'error' && '❌ Transaction Failed'}
+                  {transactionStatus === 'pending' && '⚡ Processing Transaction...'}
                 </p>
                 
                 <p className={`text-sm mt-1 ${
-                  status === 'success' ? 'text-green-700' :
-                  status === 'error' ? 'text-red-700' :
+                  transactionStatus === 'success' ? 'text-green-700' :
+                  transactionStatus === 'error' ? 'text-red-700' :
                   'text-blue-700'
                 }`}>
-                  {status === 'success' && `Sent ${amount} USDC to ${formatAddress(recipient)} ${sponsorshipStatus.eligible ? 'with ZERO gas fees!' : 'successfully!'}`}
-                  {status === 'error' && (error?.message || 'Please try again')}
-                  {status === 'pending' && `Your ${sponsorshipStatus.eligible ? 'gasless ' : ''}transaction is being processed...`}
+                  {transactionStatus === 'success' && `Sent ${amount} USDC to ${formatAddress(recipient)}${paymasterSupported ? ' with ZERO gas fees!' : ''}`}
+                  {transactionStatus === 'error' && (errorMessage || 'Please try again')}
+                  {transactionStatus === 'pending' && 'Your transaction is being processed...'}
                 </p>
 
-                {hash && (
+                {txHash && (
                   <a 
-                    href={`https://sepolia.basescan.org/tx/${hash}`}
+                    href={`https://sepolia.basescan.org/tx/${txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 underline mt-2"
                   >
-                    <span>View on BaseScan: {formatAddress(hash)}</span>
+                    <span>View on BaseScan: {formatAddress(txHash)}</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
@@ -441,20 +433,22 @@ export default function GaslessPayment() {
         {/* Info */}
         <div className="p-3 bg-blue-50 rounded border">
           <p className="text-xs text-blue-700">
-            {sponsorshipStatus.eligible 
-              ? '⚡ <strong>Gas Sponsored:</strong> This transaction will be paid for by the paymaster service via your smart wallet.'
-              : '💰 <strong>Gas Required:</strong> This transaction requires ETH for gas fees.'
-            }
+            ⚡ <strong>Official Pattern:</strong> Using getCryptoKeyAccount() to get address, exactly as shown in Base documentation.
           </p>
         </div>
 
-        {/* Paymaster Policy */}
-        <div className="p-3 bg-gray-50 rounded border">
-          <p className="text-xs text-gray-600">
-            <strong>Sponsorship Policy:</strong> {paymasterService.getSponsorshipPolicy()} • 
-            <strong> Max Amount:</strong> $1,000 USDC • 
-            <strong> Allowed Contracts:</strong> USDC only • 
-            <strong> Min Balance:</strong> 1 USDC required
+        {/* Testnet Notice */}
+        <div className="p-3 bg-yellow-50 rounded border">
+          <p className="text-xs text-yellow-700">
+            🧪 <strong>Base Sepolia Testnet:</strong> Get test USDC from{' '}
+            <a 
+              href="https://faucet.circle.com/" 
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline"
+            >
+              Circle Faucet
+            </a>
           </p>
         </div>
       </div>
