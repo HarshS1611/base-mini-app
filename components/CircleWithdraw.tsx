@@ -39,13 +39,6 @@ export default function CircleWithdraw() {
   const currentBalance = parseFloat(usdcBalance?.formatted || '0');
 
 
-  // Check if paymaster is supported
-  const { 
-    isSupported: paymasterSupported, 
-    isChecking: checkingPaymaster,
-    error: paymasterError 
-  } = usePaymasterCapabilities(provider, fromAddress, isInitialized);
-
   const handleSendSponsoredTransaction = async () => {
     // Validation - exactly as in official docs
     if (!fromAddress) {
