@@ -11,6 +11,7 @@ import { Send, ArrowDownToLine, ArrowUpFromLine, Zap, Users } from 'lucide-react
 import OnRampPartnerCard from '@/components/OnrampFlow';
 import CircleDeposit from '@/components/CircleDeposit';
 import CircleWithdraw from '@/components/CircleWithdraw';
+import AddBankAccount from '@/components/AddBankAccount';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState('send');
@@ -33,6 +34,7 @@ export default function Home() {
     { id: 'send', label: 'Send', icon: Send },
     { id: 'deposit', label: 'Deposit', icon: ArrowDownToLine },
     { id: 'withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
+    { id: 'onramp', label: 'Onramp', icon: ArrowDownToLine },
   ];
 
 
@@ -84,6 +86,7 @@ export default function Home() {
           {activeTab === 'send' && <GaslessPayment />}
           {activeTab === 'deposit' && <CircleDeposit />}
           {activeTab === 'withdraw' && <CircleWithdraw />}
+          {activeTab === 'onramp' && <AddBankAccount />}
         </div>
 
         {/* Demo Receiver Choice */}

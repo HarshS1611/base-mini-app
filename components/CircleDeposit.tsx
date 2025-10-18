@@ -39,13 +39,7 @@ export default function CircleDeposit() {
     (async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/circle/bank-accounts',{
-          method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: address,
-        }),
-        });
+        const response = await fetch('/api/circle/bank-accounts');
         const data = await response.json();
 
         if (data.success && data.bankAccounts.length > 0) {

@@ -4,23 +4,11 @@ import { useAccount } from 'wagmi';
 
 export async function GET(request: NextRequest) {
   try {
-    const body = await request.json();
-
-    const { address } = body;
-
-    console.log('Fetching bank accounts for wallet:', address);
-
+    
     const client = getCircleClient();
     const response = await client.getWireBankAccounts();
 
     let accounts = response.data || [];
-
-    // Optionally filter accounts by walletAddress if stored server side
-    if (address) {
-      accounts = accounts.filter(acc =>
-        acc.description?.includes(address.slice(0, 10))
-      );
-    }
 
     return NextResponse.json({
       success: true,
