@@ -1,26 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { circleClient } from '@/lib/circle/client';
+import { getCircleClient } from '@/lib/circle/client';
 
-/**
- * POST: Create a payout (withdraw to bank)
- * Following: https://developers.circle.com/circle-mint/quickstart-withdraw-to-bank
- */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { amount, bankAccountId, beneficiaryEmail } = body;
+    const { amount, bankAccountId } = await request.json();
 
     if (!amount || !bankAccountId) {
-      return NextResponse.json(
-        { success: false, error: 'Amount and bank account ID are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'Amount and bank account required',
+      }, { status: 400 });
     }
 
-    console.log('🏦 Creating payout (withdrawal):', { amount, bankAccountId });
+    console.log('Creating payout:', { amount, bankAccountId });
 
-    // Create payout
-    const payout = await circleClient.createPayout({
+    const client = getCircleClient();
+    const payout = await client.createPayout({
       amount: {
         amount: amount.toString(),
         currency: 'USD',
@@ -29,12 +24,7 @@ export async function POST(request: NextRequest) {
         type: 'wire',
         id: bankAccountId,
       },
-      metadata: beneficiaryEmail ? {
-        beneficiaryEmail,
-      } : undefined,
     });
-
-    console.log('✅ Payout created:', payout);
 
     return NextResponse.json({
       success: true,
@@ -42,46 +32,38 @@ export async function POST(request: NextRequest) {
       message: `Withdrawal of $${amount} initiated`,
     });
   } catch (error) {
-    console.error('❌ Circle withdrawal error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Withdrawal failed',
-      },
-      { status: 500 }
-    );
+    console.error('Withdrawal error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Withdrawal failed',
+    }, { status: 500 });
   }
 }
 
-/**
- * GET: Get payout status
- */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const payoutId = searchParams.get('payoutId');
 
     if (!payoutId) {
-      return NextResponse.json(
-        { success: false, error: 'Payout ID required' },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        success: false,
+        error: 'Payout ID required',
+      }, { status: 400 });
     }
 
-    const payout = await circleClient.getPayout(payoutId);
+    const client = getCircleClient();
+    const payout = await client.getPayout(payoutId);
 
     return NextResponse.json({
       success: true,
       payout: payout.data,
     });
   } catch (error) {
-    console.error('❌ Get payout error:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get payout',
-      },
-      { status: 500 }
-    );
+    console.error('Get payout error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get payout',
+    }, { status: 500 });
   }
 }

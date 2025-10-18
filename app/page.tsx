@@ -4,7 +4,7 @@ import WalletConnect from '@/components/WalletConnect';
 import GaslessPayment from '@/components/GaslessPayment';
 import OnrampFlow from '@/components/OnrampFlow';
 import OfframpFlow from '@/components/OfframpFlow';
-import ReceiverChoice from '@/components/ReceiverChoice';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Send, ArrowDownToLine, ArrowUpFromLine, Zap, Users } from 'lucide-react';
@@ -35,25 +35,7 @@ export default function Home() {
     { id: 'withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
   ];
 
-  // Show receiver choice simulation
-  if (showReceiverChoice) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
-        <div className="max-w-md mx-auto">
-          <div className="text-center mb-6">
-            <Button 
-              variant="outline" 
-              onClick={() => setShowReceiverChoice(false)}
-              className="mb-4"
-            >
-              ← Back to FlowSend
-            </Button>
-          </div>
-          <ReceiverChoice {...mockReceiverProps} />
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
@@ -100,7 +82,7 @@ export default function Home() {
         {/* Tab Content */}
         <div>
           {activeTab === 'send' && <GaslessPayment />}
-          {activeTab === 'deposit' && <OnrampFlow />}
+          {activeTab === 'deposit' && <CircleDeposit />}
           {activeTab === 'withdraw' && <CircleWithdraw />}
         </div>
 

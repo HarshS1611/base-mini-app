@@ -45,3 +45,7 @@ export function formatCurrency(amount: string | number, currency: string = 'USDC
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return `${num.toFixed(2)} ${currency}`;
 }
+
+export function chainIdToHex(chainId: number): string {
+  return `0x${chainId.toString(16)}`;
+}

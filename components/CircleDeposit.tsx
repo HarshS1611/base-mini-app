@@ -1,218 +1,250 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAccount, useBalance } from 'wagmi';
-import { ArrowDownToLine, Loader2, Copy, CheckCircle, AlertCircle, QrCode } from 'lucide-react';
+import { 
+  ArrowDownToLine, 
+  Loader2, 
+  CheckCircle, 
+  AlertCircle, 
+  Building2, 
+  Copy,
+  Zap 
+} from 'lucide-react';
 import { USDC_CONTRACT_ADDRESS } from '@/lib/constants';
 
 export default function CircleDeposit() {
-  const [depositAddress, setDepositAddress] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [copied, setCopied] = useState(false);
+  const [amount, setAmount] = useState('100');
+  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
+  const [selectedBank, setSelectedBank] = useState('');
+  const [wireInstructions, setWireInstructions] = useState<any>(null);
+  const [stage, setStage] = useState<'start' | 'instructions' | 'processing' | 'done'>('start');
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
 
   const { address, isConnected } = useAccount();
-  const { data: usdcBalance } = useBalance({
+  const { data: usdcBalance, refetch } = useBalance({
     address,
     token: USDC_CONTRACT_ADDRESS,
   });
 
+  // Load bank accounts on mount
   useEffect(() => {
     if (!isConnected) return;
 
-    const loadDepositAddress = async () => {
+    (async () => {
+      setIsLoading(true);
       try {
-        setIsLoading(true);
-        
-        // Try to get existing addresses
-        const response = await fetch('/api/circle/deposit');
+        const response = await fetch('/api/circle/bank-accounts',{
+          method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: address,
+        }),
+        });
         const data = await response.json();
 
-        if (data.success && data.addresses && data.addresses.length > 0) {
-          // Use first USDC address
-          const usdcAddr = data.addresses.find((a: any) => a.currency === 'USD');
-          if (usdcAddr) {
-            setDepositAddress(usdcAddr.address);
-            return;
-          }
+        if (data.success && data.bankAccounts.length > 0) {
+          setBankAccounts(data.bankAccounts);
+          setSelectedBank(data.bankAccounts[0].id);
         }
-
-        // Create new deposit address
-        const createResponse = await fetch('/api/circle/deposit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            currency: 'USD',
-            chain: 'ETH',
-          }),
-        });
-
-        const createData = await createResponse.json();
-        if (createData.success && createData.address) {
-          setDepositAddress(createData.address.address);
-        }
-      } catch (err) {
-        console.error('Failed to load deposit address:', err);
-        setError('Failed to load deposit address. Please check Circle API configuration.');
+      } catch (error) {
+        console.error('Failed to load bank accounts:', error);
       } finally {
         setIsLoading(false);
       }
-    };
-
-    loadDepositAddress();
+    })();
   }, [isConnected]);
 
-  const copyAddress = () => {
-    navigator.clipboard.writeText(depositAddress);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  // Fetch wire instructions for deposit
+  const getWireInstructions = async () => {
+    if (!selectedBank || !amount) return;
+    setIsLoading(true);
+
+    try {
+      const res = await fetch('/api/circle/deposit/instructions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bankAccountId: selectedBank,
+          amount: parseFloat(amount),
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setWireInstructions(data.instructions);
+        setStage('instructions');
+      } else {
+        setMessage(data.error || 'Failed to get wire instructions');
+      }
+    } catch (error) {
+      setMessage('Error fetching wire instructions');
+    }
+    setIsLoading(false);
   };
 
-  const currentBalance = parseFloat(usdcBalance?.formatted || '0');
+  // Simulate wire deposit and mint USDC to wallet (sandbox only)
+  const simulateWireDepositAndMint = async () => {
+    if (!wireInstructions) return;
+    setIsLoading(true);
+    setStage('processing');
+    setMessage('');
+
+    try {
+      // Mock the wire deposit
+      const mockRes = await fetch('/api/circle/deposit/mock-wire', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          trackingRef: wireInstructions.trackingRef,
+          accountNumber: wireInstructions.beneficiaryBank.accountNumber,
+        }),
+      });
+      const mockData = await mockRes.json();
+      if (!mockData.success) throw new Error(mockData.error);
+
+      // Mint USDC to user's Base wallet
+      const transferRes = await fetch('/api/circle/deposit/transfer-to-wallet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: parseFloat(amount),
+          userAddress: address,
+        }),
+      });
+      const transferData = await transferRes.json();
+      if (!transferData.success) throw new Error(transferData.error);
+
+      setStage('done');
+      setMessage(`Successfully minted ${amount} USDC to your Base wallet!`);
+      refetch?.();
+    } catch (error) {
+      setStage('instructions');
+      setMessage(error instanceof Error ? error.message : 'Deposit failed');
+    }
+    setIsLoading(false);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
+
+  const usdcBalanceNum = parseFloat(usdcBalance?.formatted || '0').toFixed(2);
 
   if (!isConnected) {
     return (
-      <Card className="p-6">
-        <div className="flex items-center space-x-2 mb-4">
-          <ArrowDownToLine className="w-5 h-5 text-blue-500" />
-          <h3 className="text-lg font-semibold">Deposit USDC</h3>
-          <Badge variant="outline">Receive USDC</Badge>
-        </div>
-        
-        <Card className="p-4 bg-yellow-50 border-yellow-200">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-yellow-600" />
-            <p className="text-sm text-yellow-800">
-              Please connect your wallet to deposit funds.
-            </p>
-          </div>
-        </Card>
+      <Card className="p-6 text-center">
+        <AlertCircle className="w-6 h-6 text-yellow-600 mx-auto mb-4" />
+        <p className="text-yellow-800 font-semibold">Please connect your wallet to deposit funds.</p>
       </Card>
     );
   }
 
   return (
-    <Card className="p-6">
-      <div className="flex items-center space-x-2 mb-4">
+    <Card className="p-6 space-y-5">
+      <div className="flex items-center gap-2">
         <ArrowDownToLine className="w-5 h-5 text-blue-500" />
-        <h3 className="text-lg font-semibold">Deposit USDC</h3>
-        <Badge variant="outline">Receive USDC</Badge>
+        <h3 className="text-lg font-semibold">Deposit Fiat to USDC</h3>
+        <Badge variant="outline">Bank → USDC on Base</Badge>
       </div>
 
-      <div className="space-y-4">
-        {/* Current Balance */}
-        <div className="p-3 bg-blue-50 rounded border">
-          <p className="text-sm text-gray-600">Current USDC Balance</p>
-          <p className="text-xl font-bold text-blue-600">
-            {currentBalance.toFixed(2)} USDC
-          </p>
-        </div>
-
-        {error && (
-          <Card className="p-4 bg-red-50 border-red-200">
-            <div className="flex items-start space-x-2">
-              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-red-800">Configuration Error</p>
-                <p className="text-xs text-red-700 mt-1">{error}</p>
-                <div className="mt-2">
-                  <a 
-                    href="/api/circle/test" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs text-red-600 underline"
-                  >
-                    Test Circle API Connection
-                  </a>
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-            <span className="ml-2 text-gray-600">Loading deposit address...</span>
-          </div>
-        ) : depositAddress ? (
-          <>
-            {/* Deposit Address */}
-            <Card className="p-4 bg-green-50 border-green-200">
-              <div className="flex items-center space-x-2 mb-2">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <p className="text-sm font-medium text-green-800">Your Deposit Address</p>
-              </div>
-              <p className="text-xs text-green-700 mb-3">
-                Send USDC (ERC-20) to this address on Ethereum network
-              </p>
-              
-              <div className="bg-white p-3 rounded border flex items-center justify-between">
-                <code className="text-xs font-mono text-gray-800 break-all flex-1">
-                  {depositAddress}
-                </code>
-                <Button
-                  onClick={copyAddress}
-                  variant="ghost"
-                  size="sm"
-                  className="ml-2"
-                >
-                  {copied ? (
-                    <CheckCircle className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </Button>
-              </div>
-            </Card>
-
-            {/* Instructions */}
-            <Card className="p-4 bg-blue-50 border-blue-200">
-              <p className="text-sm font-medium text-blue-800 mb-2">How to Deposit:</p>
-              <ol className="text-xs text-blue-700 space-y-1">
-                <li>1. Copy the deposit address above</li>
-                <li>2. Send USDC (ERC-20) from any wallet or exchange</li>
-                <li>3. Funds will appear in your balance after confirmation</li>
-                <li>4. Minimum: 1 USDC</li>
-              </ol>
-            </Card>
-
-            {/* Get Testnet USDC */}
-            <Card className="p-4 bg-yellow-50 border-yellow-200">
-              <p className="text-sm font-medium text-yellow-800 mb-2">
-                🧪 Get Testnet USDC
-              </p>
-              <p className="text-xs text-yellow-700 mb-2">
-                For testing, get free testnet USDC:
-              </p>
-              <a
-                href="https://faucet.circle.com/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-yellow-800 underline inline-flex items-center"
-              >
-                Circle Testnet Faucet
-                <ArrowDownToLine className="w-3 h-3 ml-1" />
-              </a>
-            </Card>
-          </>
-        ) : (
-          <Card className="p-4 bg-yellow-50 border-yellow-200">
-            <p className="text-sm text-yellow-800">
-              Unable to generate deposit address. Please check your Circle API configuration.
-            </p>
-          </Card>
-        )}
-
-        {/* Info */}
-        <div className="p-3 bg-blue-50 rounded border">
-          <p className="text-xs text-blue-700">
-            🏦 <strong>Powered by Circle:</strong> Receive USDC directly to your Circle-managed address. Funds are automatically credited to your balance.
-          </p>
-        </div>
+      <div className="p-3 bg-blue-50 rounded border">
+        <span>USDC Balance:</span>{' '}
+        <span className="font-bold text-blue-700">{usdcBalanceNum} USDC</span>
       </div>
+
+      {stage === 'start' && (
+        <>
+          <Input
+            type="number"
+            min={10}
+            placeholder="Amount in USD"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            disabled={isLoading}
+          />
+
+          <Select value={selectedBank} onValueChange={(value) => setSelectedBank(value)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select Deposit Bank Account" />
+            </SelectTrigger>
+            <SelectContent>
+              {bankAccounts.map((bank) => (
+                <SelectItem key={bank.id} value={bank.id}>
+                  {bank.description || `Bank ****${bank.accountNumber?.slice(-4)}`}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button disabled={isLoading || !amount || !selectedBank} onClick={getWireInstructions} className="w-full">
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Fetching Instructions
+              </>
+            ) : (
+              <>
+                <Building2 className="w-4 h-4 mr-2" /> Get Wire Instructions
+              </>
+            )}
+          </Button>
+        </>
+      )}
+
+      {stage === 'instructions' && wireInstructions && (
+        <>
+          <Card className="p-4 bg-green-50 border-green-300 space-y-2">
+            <p className="text-lg font-semibold text-green-700">Wire Transfer Details</p>
+            <p><strong>Bank:</strong> {wireInstructions.beneficiaryBank.name}</p>
+            <p><strong>Account Number:</strong> {wireInstructions.beneficiaryBank.accountNumber}</p>
+            <p><strong>Routing Number:</strong> {wireInstructions.beneficiaryBank.routingNumber}</p>
+            <p><strong>Tracking Reference:</strong> {wireInstructions.trackingRef}</p>
+          </Card>
+
+          <Button onClick={simulateWireDepositAndMint} disabled={isLoading} className="w-full bg-green-600 hover:bg-green-700">
+            {isLoading ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Simulating Deposit & Minting USDC
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 mr-2" /> Simulate Deposit & Mint USDC
+              </>
+            )}
+          </Button>
+
+          <Button onClick={() => { setStage('start'); setWireInstructions(null); setMessage(''); }} variant="outline" className="w-full">
+            Cancel
+          </Button>
+        </>
+      )}
+
+      {stage === 'processing' && (
+        <Card className="p-6 bg-blue-50 border-blue-200 text-center">
+          <Loader2 className="w-10 h-10 mx-auto mb-2 animate-spin text-blue-600" />
+          <p className="font-semibold text-blue-700">Processing your deposit...</p>
+        </Card>
+      )}
+
+      {stage === 'done' && (
+        <Card className="p-6 bg-green-50 border-green-300 text-center">
+          <CheckCircle className="w-10 h-10 mx-auto mb-2 text-green-600" />
+          <p className="font-semibold text-green-700">{message}</p>
+          <Button onClick={() => { setStage('start'); setWireInstructions(null); setAmount(''); setMessage(''); }} className="mt-4 w-full">
+            Make another deposit
+          </Button>
+        </Card>
+      )}
+
+      {message && stage !== 'done' && (
+        <p className="text-center text-xs text-red-600">{message}</p>
+      )}
     </Card>
   );
 }

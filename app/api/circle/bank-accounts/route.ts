@@ -1,38 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getCircleClient } from '@/lib/circle/client';
+import { useAccount } from 'wagmi';
 
-/**
- * GET: Get list of bank accounts
- */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Check if Circle is configured
-    if (!process.env.CIRCLE_API_KEY) {
-      return NextResponse.json({
-        success: false,
-        error: 'Circle API not configured',
-        bankAccounts: [],
-      });
-    }
+    const body = await request.json();
+
+    const { address } = body;
+
+    console.log('Fetching bank accounts for wallet:', address);
 
     const client = getCircleClient();
     const response = await client.getWireBankAccounts();
-    console.log('✅ Retrieved bank accounts',response);
+
+    let accounts = response.data || [];
+
+    // Optionally filter accounts by walletAddress if stored server side
+    if (address) {
+      accounts = accounts.filter(acc =>
+        acc.description?.includes(address.slice(0, 10))
+      );
+    }
 
     return NextResponse.json({
       success: true,
-      bankAccounts: response.data || [],
+      bankAccounts: accounts,
     });
   } catch (error) {
-    console.error('❌ Get bank accounts error:', error);
-    
-    // Return graceful error for UI
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get bank accounts',
       bankAccounts: [],
-      needsConfiguration: error instanceof Error && error.message.includes('credentials'),
-    });
+    }, { status: 500 });
   }
 }
 
@@ -41,20 +40,14 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
-    if (!process.env.CIRCLE_API_KEY) {
-      return NextResponse.json({
-        success: false,
-        error: 'Circle API not configured',
-      }, { status: 500 });
-    }
-
     const body = await request.json();
     const {
       accountNumber,
       routingNumber,
       accountHolderName,
-      address,
       bankName,
+      address,
+      baseWalletAddress,  // Optional, your addition
     } = body;
 
     if (!accountNumber || !routingNumber || !accountHolderName || !address) {
@@ -64,7 +57,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🏦 Creating wire bank account');
+    // Optionally add base wallet address to description for tracking
+    const description = baseWalletAddress 
+      ? `Wallet: ${baseWalletAddress.slice(0, 10)}...`
+      : 'No wallet address';
 
     const client = getCircleClient();
     const response = await client.createWireBankAccount({
@@ -82,22 +78,20 @@ export async function POST(request: NextRequest) {
         bankName: bankName || 'Bank',
         city: address.city,
         country: address.country || 'US',
-        line1: address.line1,
-        district: address.state || address.district,
       },
+      // Could add description or metadata if Circle supports it
+      // Here we send as 'bankName' or billingDetails.name, depending on API
     });
-
-    console.log('✅ Bank account created');
 
     return NextResponse.json({
       success: true,
       bankAccount: response.data,
+      description,
     });
   } catch (error) {
-    console.error('❌ Create bank account error:', error);
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to create bank account',
-    }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Failed to create bank account' },
+      { status: 500 }
+    );
   }
 }
