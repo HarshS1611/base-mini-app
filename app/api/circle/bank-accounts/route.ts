@@ -6,9 +6,9 @@ export async function GET(request: NextRequest) {
   try {
     
     const client = getCircleClient();
-    const response = await client.getWireBankAccounts();
+    const response = await client.getWireBankAccounts() as { data: any[] }; // Type assertion added
 
-    let accounts = response.data || [];
+    const accounts = response.data || [];
 
     return NextResponse.json({
       success: true,
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      bankAccount: response.data,
+      bankAccount: (response as { data: any }).data,
       description,
     });
   } catch (error) {

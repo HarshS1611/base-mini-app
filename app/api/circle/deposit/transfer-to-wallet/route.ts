@@ -16,11 +16,11 @@ export async function POST(request: NextRequest) {
 
     // Get all recipient addresses
     const allRecipientsResponse = await client.getReciepientAddresses();
-    console.log('📬 All Recipients:', allRecipientsResponse.data);
-    const recipients = allRecipientsResponse.data || [];
+    console.log('📬 All Recipients:', (allRecipientsResponse as { data: any }).data);
+    const recipients = (allRecipientsResponse as { data: any }).data || [];
 
     // Try to find existing recipient by address and chain
-    let existingRecipient = recipients.find(
+    const existingRecipient = recipients.find(
       (r: any) => r.address.toLowerCase() === userAddress.toLowerCase() && r.chain === 'BASE'
     );
 
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
         chain: 'BASE',
         address: userAddress,
         currency: 'USD',
-      });
+      }) as { data: { id: string } };
 
       addressId = createdRecipient.data?.id;
       if (!addressId) throw new Error('Failed to create recipient address');
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
         amount: amount.toString(),
         currency: 'USD',
       },
-    });
+    }) as { data: any }; // Cast to expected type
 
     return NextResponse.json({
       success: true,

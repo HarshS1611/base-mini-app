@@ -2,14 +2,22 @@
 import { NextRequest } from "next/server";
 import { baseAgent } from "@/agent/baseAgent";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
-// List the environment variables that should be available in the Edge runtime
-export const envVars = [
-  "CDP_API_KEY_NAME",
-  "CDP_API_KEY_PRIVATE_KEY",
-  "GEMINI_API_KEY",
-];
+
+import { NextResponse } from "next/server";
+
+export async function GET() {
+  const apiKeyName = process.env.CDP_API_KEY_NAME;
+  const privateKey = process.env.CDP_API_KEY_PRIVATE_KEY;
+  const geminikey = process.env.GEMINI_API_KEY;
+
+  if (!apiKeyName || !privateKey || !geminikey) {
+    return NextResponse.json({ error: "Missing environment variables" }, { status: 500 });
+  }
+
+  return NextResponse.json({ message: "API is working", apiKeyName });
+}
 
 export async function POST(req: NextRequest) {
   try {

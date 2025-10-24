@@ -31,7 +31,7 @@ export default function AgentChat() {
     if (!input.trim() || isLoading || !context?.user) return;
 
     // Add user message
-    const newMessages = [...messages, { role: "user", content: input }];
+    const newMessages: Message[] = [...messages, { role: "user" as "user", content: input }];
     setMessages(newMessages);
     setInput("");
     setIsLoading(true);

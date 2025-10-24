@@ -70,17 +70,17 @@ export function createAgentKitInstance() {
 
     // Create AgentKit with the walletProvider and a set of action providers
     // that make sense for a Base mini-app.
-    const kit = await AgentKit.from({
-      walletProvider,
-      actionProviders: [
-        walletActionProvider(),
-        erc20ActionProvider(),
-        erc721ActionProvider(),
-        pythActionProvider(),
-      ],
-    });
+    // const kit = await AgentKit.from({
+    //   walletProvider,
+    //   actionProviders: [
+    //     walletActionProvider(),
+    //     erc20ActionProvider(),
+    //     erc721ActionProvider(),
+    //     pythActionProvider(),
+    //   ],
+    // });
 
-    return kit;
+    // return kit;
   };
 
   // Return a thin wrapper that exposes createAgent similar to the fallback,

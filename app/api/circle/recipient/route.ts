@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       chain,
       address: userAddress,
       currency: 'USD',
-    });
+    }) as { data: any }; 
 
     return NextResponse.json({
       success: true,

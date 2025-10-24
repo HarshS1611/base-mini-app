@@ -1,12 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { createBaseAccountSDK, getCryptoKeyAccount } from '@base-org/account';
-import type { BaseAccountProvider } from '@base-org/account';
+import type { ProviderInterface } from '@base-org/account';
 import { useAccount } from 'wagmi';
 import { BASE_SEPOLIA_CHAIN_ID } from '@/lib/constants';
 
 export function useBaseAccount() {
-  const [provider, setProvider] = useState<BaseAccountProvider | null>(null);
+  const [provider, setProvider] = useState<ProviderInterface | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<Error | null>(null);

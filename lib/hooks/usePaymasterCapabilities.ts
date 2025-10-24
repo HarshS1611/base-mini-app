@@ -1,11 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import type { BaseAccountProvider } from '@base-org/account';
+import type { ProviderInterface } from '@base-org/account';
 import { BASE_SEPOLIA_CHAIN_ID } from '@/lib/constants';
-import { base } from '@base-org/account';
 
 export function usePaymasterCapabilities(
-  provider: BaseAccountProvider | null,
+  provider: ProviderInterface | null,
   address: string | null,
   isInitialized: boolean
 ) {
@@ -58,10 +57,18 @@ export function usePaymasterCapabilities(
           hex: chainIdHex
         });
 
-        // Try to find capabilities using both decimal and hex chain IDs
-        let baseCapabilities = capabilities?.[chainIdDecimal] || 
-                              capabilities?.[chainIdHex] ||
-                              capabilities?.[chainIdHex.toLowerCase()];
+        // Define the type for capabilities to allow indexing
+        type CapabilitiesType = {
+          [key: string]: {
+            paymasterService?: {
+              supported?: boolean;
+            };
+          };
+        };
+
+        const baseCapabilities = (capabilities as CapabilitiesType)?.[chainIdDecimal] || 
+                              (capabilities as CapabilitiesType)?.[chainIdHex] ||
+                              (capabilities as CapabilitiesType)?.[chainIdHex.toLowerCase()];
         const supported = baseCapabilities?.paymasterService?.supported === true;
         
         console.log('Paymaster support status:', {

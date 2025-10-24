@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      instructions: instructions.data,
+      instructions: (instructions as { data: any }).data, // Type assertion added here
       amount,
     });
   } catch (error) {

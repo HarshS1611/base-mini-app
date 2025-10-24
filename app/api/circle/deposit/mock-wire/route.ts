@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      deposit: deposit.data,
+      deposit: (deposit as { data: any }).data, // Replace 'any' with the appropriate type if known
       message: 'Mock wire deposit created. Processing in ~15 minutes.',
     });
   } catch (error) {

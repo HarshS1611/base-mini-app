@@ -88,7 +88,7 @@ export function ChatInterface() {
 
   return (
     <Card className="w-full max-w-4xl mx-auto h-[600px] flex flex-col overflow-hidden">
-      <CardHeader className="flex-shrink-0 border-b">
+      <CardHeader className="shrink-0 border-b">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
@@ -114,10 +114,10 @@ export function ChatInterface() {
               </p>
               <div className="text-sm mt-4 space-y-2 max-w-md mx-auto text-left bg-muted/50 rounded-lg p-4">
                 <p className="font-medium text-center mb-2">Try asking:</p>
-                <p>• "What's my wallet address?"</p>
-                <p>• "How do I send USDC?"</p>
-                <p>• "Where can I get test tokens?"</p>
-                <p>• "Explain what a smart wallet is"</p>
+                <p>• &ldquo;What&apos;s my wallet address?&rdquo;</p>
+                <p>• &ldquo;How do I send USDC?&rdquo;</p>
+                <p>• &ldquo;Where can I get test tokens?&rdquo;</p>
+                <p>• &ldquo;Explain what a smart wallet is&rdquo;</p>
               </div>
             </div>
           )}
@@ -137,7 +137,7 @@ export function ChatInterface() {
                     message.role === "user" ? "flex-row-reverse" : "flex-row"
                   }`}
                 >
-                  <div className="flex-shrink-0">
+                  <div className="shrink-0">
                     {message.role === "user" ? (
                       <div className="bg-primary rounded-full p-1">
                         <User className="h-4 w-4 text-primary-foreground" />
@@ -182,7 +182,7 @@ export function ChatInterface() {
           {isLoading && (
             <div className="flex gap-3 justify-start">
               <div className="flex gap-3 max-w-[80%]">
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <div className="bg-blue-500 rounded-full p-1">
                     <Bot className="h-4 w-4 text-white" />
                   </div>
@@ -202,13 +202,13 @@ export function ChatInterface() {
         </div>
 
         {!isConnected && (
-          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 flex items-center gap-2 flex-shrink-0">
+          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 flex items-center gap-2 shrink-0">
             <AlertCircle className="h-4 w-4" />
             <span>Connect your wallet above to get started</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="flex gap-2 flex-shrink-0">
+        <form onSubmit={handleSubmit} className="flex gap-2 shrink-0">
           <Input
             value={input}
             onChange={handleInputChange}

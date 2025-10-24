@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
         type: 'wire',
         id: bankAccountId,
       },
-    });
+    }) as { data: any }; 
 
     return NextResponse.json({
       success: true,
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
     }
 
     const client = getCircleClient();
-    const payout = await client.getPayout(payoutId);
+    const payout = await client.getPayout(payoutId) as { data: any };
 
     return NextResponse.json({
       success: true,
