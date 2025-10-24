@@ -6,14 +6,14 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAccount, useBalance } from 'wagmi';
-import { 
-  ArrowDownToLine, 
-  Loader2, 
-  CheckCircle, 
-  AlertCircle, 
-  Building2, 
+import {
+  ArrowDownToLine,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Building2,
   Copy,
-  Zap 
+  Zap
 } from 'lucide-react';
 import { USDC_CONTRACT_ADDRESS } from '@/lib/constants';
 
@@ -115,6 +115,13 @@ export default function CircleDeposit() {
       const transferData = await transferRes.json();
       if (!transferData.success) throw new Error(transferData.error);
 
+      if (transferData.transfer == null) {
+        setStage('instructions');
+        setMessage(transferData.message || 'Please wait for admin confirmation and retry.');
+        setIsLoading(false);
+        return;
+      }
+
       setStage('done');
       setMessage(`Successfully minted ${amount} USDC to your Base wallet!`);
       refetch?.();
@@ -141,7 +148,7 @@ export default function CircleDeposit() {
   }
 
   return (
-    <Card className="p-6 space-y-5">
+    <Card className="p-6 space-y-2">
       <div className="flex items-center gap-2">
         <ArrowDownToLine className="w-5 h-5 text-blue-500" />
         <h3 className="text-lg font-semibold">Deposit Fiat to USDC</h3>
@@ -193,7 +200,7 @@ export default function CircleDeposit() {
 
       {stage === 'instructions' && wireInstructions && (
         <>
-          <Card className="p-4 bg-green-50 border-green-300 space-y-2">
+          <Card className="p-4 bg-green-50 border-green-300">
             <p className="text-lg font-semibold text-green-700">Wire Transfer Details</p>
             <p><strong>Bank:</strong> {wireInstructions.beneficiaryBank.name}</p>
             <p><strong>Account Number:</strong> {wireInstructions.beneficiaryBank.accountNumber}</p>
@@ -237,7 +244,10 @@ export default function CircleDeposit() {
       )}
 
       {message && stage !== 'done' && (
-        <p className="text-center text-xs text-red-600">{message}</p>
+        <Card className="p-4 bg-red-50 border-red-300 space-y-1">
+
+          <p className="text-center text-base font-semibold text-red-600">{message}</p>
+        </Card>
       )}
     </Card>
   );

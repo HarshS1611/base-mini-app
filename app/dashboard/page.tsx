@@ -2,8 +2,6 @@
 import { useState } from "react";
 import WalletConnect from "@/components/WalletConnect";
 import GaslessPayment from "@/components/GaslessPayment";
-import OnrampFlow from "@/components/OnrampFlow";
-import OfframpFlow from "@/components/OfframpFlow";
 import { ChatInterface } from "@/components/chat-interface";
 
 import { Button } from "@/components/ui/button";

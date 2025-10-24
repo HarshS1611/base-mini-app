@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAccount, useBalance } from 'wagmi';
 import { parseUnits, encodeFunctionData, numberToHex } from 'viem';
 import type { Address } from 'viem';
@@ -209,13 +208,7 @@ export default function GaslessPayment() {
       </div>
 
       <div className="space-y-4">
-        {/* Display the address from getCryptoKeyAccount */}
-        {fromAddress && (
-          <div className="p-3 bg-purple-50 rounded border">
-            <p className="text-xs text-purple-600 mb-1">Smart Wallet Address (from getCryptoKeyAccount)</p>
-            <p className="text-sm font-mono text-purple-800">{fromAddress}</p>
-          </div>
-        )}
+       
 
         {/* Balance Display */}
         <div className="grid grid-cols-2 gap-3">
@@ -322,23 +315,12 @@ export default function GaslessPayment() {
         {/* Recipient Selection */}
         <div className="space-y-2">
           <label className="text-sm font-medium">Recipient</label>
-          <Select 
-            value={recipient} 
-            onValueChange={(value) => setRecipient(value as Address)} 
+          <Input
+            placeholder="0xRecipientAddress"
+            value={recipient}
+            onChange={(e) => setRecipient(e.target.value as Address)}
             disabled={transactionStatus === 'pending'}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select recipient" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={DEMO_ADDRESSES.recipient1}>
-                Demo Address 1 ({formatAddress(DEMO_ADDRESSES.recipient1)})
-              </SelectItem>
-              <SelectItem value={DEMO_ADDRESSES.recipient2}>
-                Demo Address 2 ({formatAddress(DEMO_ADDRESSES.recipient2)})
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          />
         </div>
 
         {/* Description */}

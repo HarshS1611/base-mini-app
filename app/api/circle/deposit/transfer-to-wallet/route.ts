@@ -38,6 +38,12 @@ export async function POST(request: NextRequest) {
 
       addressId = createdRecipient.data?.id;
       if (!addressId) throw new Error('Failed to create recipient address');
+
+      return NextResponse.json({
+        success: true,
+        transfer: null,
+        message: `Recipient address created. Please wait for the confirmation from admin and retry the transfer.`,
+      });
     }
 
     // Create transfer to the verified blockchain address
