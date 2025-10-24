@@ -140,6 +140,10 @@ export function createAgentKitInstance() {
             // - If a matching action is found, invoke it with an empty object (many actions accept minimal args).
             // - If no match, return a list of available actions the agent can perform.
           }
+          catch (err) {
+            return `Agent initialization error: ${String(err)}`;
+          }
+          
           // Use AgentKit's action providers to respond.
           // Strategy:
           // - Get available actions from the kit (these are bound to the configured wallet provider).
