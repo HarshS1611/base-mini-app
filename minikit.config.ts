@@ -8,7 +8,8 @@ const ROOT_URL =
  *
  * @see {@link https://docs.base.org/mini-apps/features/manifest}
  */
-export const minikitConfig = {
+export const minikitConfig = 
+{
   accountAssociation: {
     header: "",
     payload: "",
