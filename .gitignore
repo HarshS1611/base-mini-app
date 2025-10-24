@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AgentKit wallet data (contains sensitive wallet information)
+.wallet-data/
+wallet_data.json

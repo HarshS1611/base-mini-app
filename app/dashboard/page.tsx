@@ -1,27 +1,33 @@
-'use client';
-import { useState } from 'react';
-import WalletConnect from '@/components/WalletConnect';
-import GaslessPayment from '@/components/GaslessPayment';
-import OnrampFlow from '@/components/OnrampFlow';
-import OfframpFlow from '@/components/OfframpFlow';
+"use client";
+import { useState } from "react";
+import WalletConnect from "@/components/WalletConnect";
+import GaslessPayment from "@/components/GaslessPayment";
+import OnrampFlow from "@/components/OnrampFlow";
+import OfframpFlow from "@/components/OfframpFlow";
+import { ChatInterface } from "@/components/chat-interface";
 
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Send, ArrowDownToLine, ArrowUpFromLine, Zap, Users } from 'lucide-react';
-import CircleDeposit from '@/components/CircleDeposit';
-import CircleWithdraw from '@/components/CircleWithdraw';
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Send,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Zap,
+  Users,
+  Bot,
+} from "lucide-react";
+import CircleDeposit from "@/components/CircleDeposit";
+import CircleWithdraw from "@/components/CircleWithdraw";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState('send');
-
+  const [activeTab, setActiveTab] = useState("send");
 
   const tabs = [
-    { id: 'send', label: 'Send', icon: Send },
-    { id: 'deposit', label: 'Deposit', icon: ArrowDownToLine },
-    { id: 'withdraw', label: 'Withdraw', icon: ArrowUpFromLine },
+    { id: "send", label: "Send", icon: Send },
+    { id: "deposit", label: "Deposit", icon: ArrowDownToLine },
+    { id: "withdraw", label: "Withdraw", icon: ArrowUpFromLine },
+    { id: "chat", label: "AI Agent", icon: Bot },
   ];
-
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
@@ -35,7 +41,9 @@ export default function Home() {
             </h1>
           </div>
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <p className="text-gray-600 text-sm">Send money like sending a text</p>
+            <p className="text-gray-600 text-sm">
+              Send money like sending a text
+            </p>
             <div className="flex items-center space-x-1 text-green-600">
               <Zap className="w-4 h-4" />
               <span className="text-xs font-medium">Gas Free</span>
@@ -54,7 +62,7 @@ export default function Home() {
           {tabs.map((tab) => (
             <Button
               key={tab.id}
-              variant={activeTab === tab.id ? 'default' : 'ghost'}
+              variant={activeTab === tab.id ? "default" : "ghost"}
               onClick={() => setActiveTab(tab.id)}
               className="flex-1 flex items-center space-x-2"
               size="sm"
@@ -67,12 +75,11 @@ export default function Home() {
 
         {/* Tab Content */}
         <div>
-          {activeTab === 'send' && <GaslessPayment />}
-          {activeTab === 'deposit' && <CircleDeposit />}
-          {activeTab === 'withdraw' && <CircleWithdraw />}
+          {activeTab === "send" && <GaslessPayment />}
+          {activeTab === "deposit" && <CircleDeposit />}
+          {activeTab === "withdraw" && <CircleWithdraw />}
+          {activeTab === "chat" && <ChatInterface />}
         </div>
-
-       
 
         {/* Footer */}
         <div className="text-center mt-8 text-xs text-gray-500">
