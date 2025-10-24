@@ -11,36 +11,34 @@ const ROOT_URL =
 export const minikitConfig = 
 {
   accountAssociation: {
-    header: "",
-    payload: "",
-    signature: "",
+    "header": "eyJmaWQiOjExMzI2MTMsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHgyMWYyNzg5QTcwMUJERDNlQjZBQjFlNzc0YWMzZTE3MjcyN0IwNGJDIn0",
+    "payload": "eyJkb21haW4iOiJmbG93c2VuZC1taW5pLWFwcC1hbHBoYS52ZXJjZWwuYXBwIn0",
+    "signature": "aN+c2WfnYMFRigDy5j+LK1hPs4bRwfv5U/UQm+ld739TU6illoUop6NqcStW/R4+AgeHUReHGNInFYbbmYF5Nxw="
   },
-  baseBuilder: {
-    allowedAddresses: [],
-  },
-  miniapp: {
-    version: "1",
-    name: "FlowSend | Send Money Globally",
-    subtitle: "Gasless Cross-Border Payment Platform",
-    description:
-      "FlowSend enables instant, zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",
-    screenshotUrls: [
-      `${ROOT_URL}/screenshots/dashboard.png`,
-      `${ROOT_URL}/screenshots/deposit.png`,
-      `${ROOT_URL}/screenshots/withdraw.png`,
-    ],
-    iconUrl: `https://base-batches-builder-track.devfolio.co/_next/image?url=https%3A%2F%2Fassets.devfolio.co%2Fhackathons%2Fbase-batches-builder-track%2Fprojects%2F526c839b6b3d429a8213d1e21628516f%2F627c3d60-8e7e-400c-92e6-0d18eca72e24.png&w=128&q=75`,
-    splashImageUrl: `https://base-batches-builder-track.devfolio.co/_next/image?url=https%3A%2F%2Fassets.devfolio.co%2Fhackathons%2Fbase-batches-builder-track%2Fprojects%2F526c839b6b3d429a8213d1e21628516f%2F627c3d60-8e7e-400c-92e6-0d18eca72e24.png&w=128&q=75`,
-    splashBackgroundColor: "#000000",
-    homeUrl: ROOT_URL,
-    webhookUrl: `${ROOT_URL}/api/webhook`,
-    primaryCategory: "utility",
-    tags: ["payment", "finance", "cross-border", "crypto", "usdc"],
-    heroImageUrl: `https://base-batches-builder-track.devfolio.co/_next/image?url=https%3A%2F%2Fassets.devfolio.co%2Fhackathons%2Fbase-batches-builder-track%2Fprojects%2F526c839b6b3d429a8213d1e21628516f%2F627c3d60-8e7e-400c-92e6-0d18eca72e24.png&w=128&q=75`,
-    tagline: "Send money globally with zero gas fees and instant settlement.",
-    ogTitle: "FlowSend - Instant Gasless Cross-Border Payments",
-    ogDescription:
-      "FlowSend leverages Base blockchain & Circle APIs to make your international transfers instant, transparent, and affordable.",
-    ogImageUrl: `https://base-batches-builder-track.devfolio.co/_next/image?url=https%3A%2F%2Fassets.devfolio.co%2Fhackathons%2Fbase-batches-builder-track%2Fprojects%2F526c839b6b3d429a8213d1e21628516f%2F627c3d60-8e7e-400c-92e6-0d18eca72e24.png&w=128&q=75`,
-  },
+baseBuilder: {
+  allowedAddresses: ["0x357D015b64Ba0A9A4bF02f4C6352712cd5feF3Da"],
+},
+miniapp: {
+  version: "1",
+  name: "flowsend",
+  subtitle: "Gasless Cross-Border Payment Platform",
+  description:
+    "FlowSend enables instant, zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",
+  screenshotUrls: [
+    `${ROOT_URL}/screenshots/flowsenLogo.png`,
+  ],
+  iconUrl: `${ROOT_URL}/flowsendLogo.png`,
+  splashImageUrl: `${ROOT_URL}/flowsendLogo.png`,
+  splashBackgroundColor: "#000000",
+  homeUrl: ROOT_URL,
+  webhookUrl: `${ROOT_URL}/api/webhook`,
+  primaryCategory: "utility",
+  tags: ["payment", "finance", "cross-border", "crypto", "usdc"],
+  heroImageUrl: `${ROOT_URL}/flowsendLogo.png`,
+  tagline: "Send money globally with zero gas fees and instant settlement.",
+  ogTitle: "FlowSend - Instant Gasless Cross-Border Payments",
+  ogDescription:
+    "FlowSend leverages Base blockchain & Circle APIs to make your international transfers instant, transparent, and affordable.",
+  ogImageUrl: `${ROOT_URL}/flowsendLogo.png`,
+},
 } as const;
