@@ -322,6 +322,8 @@ export async function POST(req: Request) {
       throw new Error("GEMINI_API_KEY is required");
     }
 
+    const lastMessage = messages[messages.length - 1]?.content || "";
+
     const bankingAction = await parseWithAI(messages);
 
     if (bankingAction.type !== "none") {
