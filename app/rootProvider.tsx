@@ -11,8 +11,8 @@ const config = createConfig({
   chains: [baseSepolia],
   connectors: [
     coinbaseWallet({
-      appName: 'FlowSend',
-      appLogoUrl: 'https://flowsend.app/logo.png',
+      appName: 'FlowSend | Gasless Cross-Border Payment Platform',
+      appLogoUrl: 'https://base-batches-builder-track.devfolio.co/_next/image?url=https%3A%2F%2Fassets.devfolio.co%2Fhackathons%2Fbase-batches-builder-track%2Fprojects%2F526c839b6b3d429a8213d1e21628516f%2F627c3d60-8e7e-400c-92e6-0d18eca72e24.png&w=128&q=75',
       preference: 'smartWalletOnly', // Force smart wallet for gasless transactions
       version: '4',
     }),
