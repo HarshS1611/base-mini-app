@@ -14,37 +14,36 @@ const ROOT_URL =
 
 export async function GET() {
   return Response.json({
-    "accountAssociation": {  // these will be added in step 5
-      "header": "",
-      "payload": "",
-      "signature": ""
+    accountAssociation: {
+      header: "",
+      payload: "",
+      signature: "",
     },
-    "baseBuilder": {
-      "ownerAddress": "0x" // add your Base Account address here
+    baseBuilder: {
+      allowedAddresses: ["0x357D015b64Ba0A9A4bF02f4C6352712cd5feF3Da"],
     },
-    "miniapp": {
-      "version": "1",
-      "name": "Example Mini App",
-      "homeUrl": "https://ex.co",
-      "iconUrl": "https://ex.co/i.png",
-      "splashImageUrl": "https://ex.co/l.png",
-      "splashBackgroundColor": "#000000",
-      "webhookUrl": "https://ex.co/api/webhook",
-      "subtitle": "Fast, fun, social",
-      "description": "A fast, fun way to challenge friends in real time.",
-      "screenshotUrls": [
-        "https://ex.co/s1.png",
-        "https://ex.co/s2.png",
-        "https://ex.co/s3.png"
+    miniapp: {
+      version: "1",
+      name: "flowsend",
+      subtitle: "Gasless Cross-Border Payment Platform",
+      description:
+        "FlowSend enables instant, zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",
+      screenshotUrls: [
+        `${ROOT_URL}/screenshots/flowsenLogo.png`,
       ],
-      "primaryCategory": "social",
-      "tags": ["example", "miniapp", "baseapp"],
-      "heroImageUrl": "https://ex.co/og.png",
-      "tagline": "Play instantly",
-      "ogTitle": "Example Mini App",
-      "ogDescription": "Challenge friends in real time.",
-      "ogImageUrl": "https://ex.co/og.png",
-      "noindex": true
-    }
+      iconUrl: `${ROOT_URL}/flowsendLogo.png`,
+      splashImageUrl: `${ROOT_URL}/flowsendLogo.png`,
+      splashBackgroundColor: "#000000",
+      homeUrl: ROOT_URL,
+      webhookUrl: `${ROOT_URL}/api/webhook`,
+      primaryCategory: "utility",
+      tags: ["payment", "finance", "cross-border", "crypto", "usdc"],
+      heroImageUrl: `${ROOT_URL}/flowsendLogo.png`,
+      tagline: "Send money globally with zero gas fees and instant settlement.",
+      ogTitle: "FlowSend - Instant Gasless Cross-Border Payments",
+      ogDescription:
+        "FlowSend leverages Base blockchain & Circle APIs to make your international transfers instant, transparent, and affordable.",
+      ogImageUrl: `${ROOT_URL}/flowsendLogo.png`,
+    },
   });
 }

@@ -20,7 +20,7 @@ export const minikitConfig =
   },
   miniapp: {
     version: "1",
-    name: "flowsend",
+    name: "FlowSend | Send Money Globally",
     subtitle: "Gasless Cross-Border Payment Platform",
     description:
       "FlowSend enables instant, zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",
