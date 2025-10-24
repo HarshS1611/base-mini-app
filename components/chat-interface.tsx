@@ -14,9 +14,19 @@ import {
 } from "lucide-react";
 import { useAccount } from "wagmi";
 import { Badge } from "@/components/ui/badge";
+import { useBaseAccount } from "@/lib/hooks/useBaseAccount";
+import { parseUnits, encodeFunctionData, numberToHex } from "viem";
+import {
+  BASE_SEPOLIA_CHAIN_ID,
+  USDC_CONTRACT_ADDRESS,
+  ERC20_ABI,
+} from "@/lib/constants";
+
+const TREASURY_ADDRESS = "0x9de5b155a9f89c343ced429a5fe10eb60750ffc0";
 
 export function ChatInterface() {
   const { address, isConnected } = useAccount();
+  const { provider, address: fromAddress, isInitialized } = useBaseAccount();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const [messages, setMessages] = useState<
@@ -29,6 +39,62 @@ export function ChatInterface() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  const executeTransaction = async (
+    params: { amount: number; recipient?: string; bankAccountId?: string },
+    action: string,
+  ) => {
+    if (!provider || !fromAddress || !isInitialized) {
+      throw new Error("Wallet not initialized");
+    }
+
+    const paymasterServiceUrl =
+      process.env.NEXT_PUBLIC_PAYMASTER_PROXY_SERVER_URL ||
+      process.env.NEXT_PUBLIC_PAYMASTER_URL;
+
+    if (!paymasterServiceUrl) {
+      throw new Error("Paymaster service URL not configured");
+    }
+
+    const amountWei = parseUnits(params.amount.toString(), 6);
+
+    // Determine recipient based on action type
+    const recipient =
+      action === "withdraw_usdc"
+        ? TREASURY_ADDRESS
+        : (params.recipient as string);
+
+    const calls = [
+      {
+        to: USDC_CONTRACT_ADDRESS,
+        value: "0x0",
+        data: encodeFunctionData({
+          abi: ERC20_ABI,
+          functionName: "transfer",
+          args: [recipient as `0x${string}`, amountWei],
+        }),
+      },
+    ];
+
+    const result = await provider.request({
+      method: "wallet_sendCalls",
+      params: [
+        {
+          version: "1.0",
+          chainId: numberToHex(BASE_SEPOLIA_CHAIN_ID),
+          from: fromAddress,
+          calls: calls,
+          capabilities: {
+            paymasterService: {
+              url: paymasterServiceUrl,
+            },
+          },
+        },
+      ],
+    });
+
+    return result as string;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,13 +122,130 @@ export function ChatInterface() {
 
       const text = await response.text();
 
-      const assistantMessage = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: text,
-      };
+      // Check if response is a transaction request
+      let transactionRequest = null;
+      try {
+        const parsed = JSON.parse(text);
+        console.log("Parsed response:", parsed);
+        if (parsed.type === "TRANSACTION_REQUEST") {
+          transactionRequest = parsed;
+          console.log("Transaction request detected:", transactionRequest);
+        }
+      } catch (e) {
+        // Not JSON, treat as regular message
+        console.log("Not a JSON response, treating as regular message");
+      }
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      if (transactionRequest) {
+        console.log(
+          "Executing transaction with params:",
+          transactionRequest.params,
+        );
+        // Show transaction message
+        const txMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: transactionRequest.message,
+        };
+        setMessages((prev) => [...prev, txMessage]);
+
+        // Execute transaction
+        try {
+          console.log("About to execute transaction...");
+          const txHash = await executeTransaction(
+            transactionRequest.params,
+            transactionRequest.action,
+          );
+          console.log("Transaction successful, hash:", txHash);
+
+          // Handle post-transaction actions
+          if (transactionRequest.action === "withdraw_usdc") {
+            // After wallet transaction, call Circle API to initiate payout
+            try {
+              const withdrawRes = await fetch("/api/circle/withdraw", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  amount: transactionRequest.params.amount,
+                  bankAccountId: transactionRequest.params.bankAccountId,
+                }),
+              });
+
+              const withdrawData = await withdrawRes.json();
+
+              if (withdrawData.success) {
+                const successMessage = {
+                  id: (Date.now() + 2).toString(),
+                  role: "assistant",
+                  content:
+                    "✅ Successfully initiated withdrawal of " +
+                    transactionRequest.params.amount +
+                    " USDC to your bank account!\n\nTransaction Hash: " +
+                    txHash +
+                    "\n\nView on BaseScan: https://sepolia.basescan.org/tx/" +
+                    txHash +
+                    "\n\nPayout ID: " +
+                    (withdrawData.payout?.id || "N/A") +
+                    "\n\nThe funds should arrive in your bank account within 1-2 business days.",
+                };
+                setMessages((prev) => [...prev, successMessage]);
+              } else {
+                throw new Error(withdrawData.error || "Circle payout failed");
+              }
+            } catch (circleError) {
+              const errorMessage = {
+                id: (Date.now() + 2).toString(),
+                role: "assistant",
+                content:
+                  "⚠️ USDC transferred to treasury but Circle payout failed: " +
+                  (circleError instanceof Error
+                    ? circleError.message
+                    : String(circleError)) +
+                  "\n\nTransaction Hash: " +
+                  txHash +
+                  "\n\nPlease contact support.",
+              };
+              setMessages((prev) => [...prev, errorMessage]);
+            }
+          } else {
+            // Transfer transaction
+            const successMessage = {
+              id: (Date.now() + 2).toString(),
+              role: "assistant",
+              content:
+                "✅ Successfully transferred " +
+                transactionRequest.params.amount +
+                " USDC to " +
+                transactionRequest.params.recipient +
+                "!\n\nTransaction Hash: " +
+                txHash +
+                "\n\nView on BaseScan: https://sepolia.basescan.org/tx/" +
+                txHash +
+                "\n\nThis was a gasless transaction - no ETH fees required!",
+            };
+            setMessages((prev) => [...prev, successMessage]);
+          }
+        } catch (txError) {
+          console.error("Transaction execution error:", txError);
+          const errorMessage = {
+            id: (Date.now() + 2).toString(),
+            role: "assistant",
+            content:
+              "❌ Transaction failed: " +
+              (txError instanceof Error ? txError.message : String(txError)) +
+              "\n\nPlease make sure you have sufficient USDC balance and try again.",
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+        }
+      } else {
+        // Regular message response
+        const assistantMessage = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: text,
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      }
     } catch (error) {
       console.error("Error:", error);
       const errorMessage = {

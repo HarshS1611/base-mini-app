@@ -18,6 +18,8 @@ interface BankingAction {
     | "deposit_usdc"
     | "withdraw_usdc"
     | "send_usdc"
+    | "check_balance"
+    | "transfer_usdc"
     | "none";
   params?: {
     amount?: number;
@@ -26,22 +28,34 @@ interface BankingAction {
   };
 }
 
-async function parseWithAI(message: string): Promise<BankingAction> {
+async function parseWithAI(
+  messages: Array<{ role: string; content: string }>,
+): Promise<BankingAction> {
   const genAI = getAI();
   if (!genAI) return { type: "none" };
 
   const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
+  // Build conversation context
+  const conversationContext = messages
+    .slice(-5) // Last 5 messages for context
+    .map((msg) => msg.role + ": " + msg.content)
+    .join("\n");
+
   const prompt =
-    "Analyze this user message and determine if it is a banking action request. Extract parameters even if incomplete. Respond ONLY with valid JSON.\n\nUser message: " +
-    message +
-    '\n\nExamples:\n- deposit 100 usdc -> {"type": "deposit_usdc", "params": {"amount": 100}}\n- withdraw 50 USDC -> {"type": "withdraw_usdc", "params": {"amount": 50}}\n- withdraw to account abc123 -> {"type": "withdraw_usdc", "params": {"bankAccountId": "abc123"}}\n- send 10 USDC to 0x123 -> {"type": "send_usdc", "params": {"amount": 10, "recipient_address": "0x123"}}\n- show my bank accounts -> {"type": "get_bank_accounts", "params": {}}\n- what is defi -> {"type": "none", "params": {}}';
+    "Analyze this conversation and determine if the user is requesting a banking action. Extract ALL parameters from the conversation history, even if they were mentioned in previous messages. Respond ONLY with valid JSON.\n\nConversation:\n" +
+    conversationContext +
+    '\n\nExamples:\n- check my balance -> {"type": "check_balance", "params": {}}\n- what\'s my balance -> {"type": "check_balance", "params": {}}\n- transfer 10 USDC to 0x123 -> {"type": "transfer_usdc", "params": {"amount": 10, "recipient_address": "0x123"}}\n- send 10 USDC to 0x123 -> {"type": "transfer_usdc", "params": {"amount": 10, "recipient_address": "0x123"}}\n- deposit 100 usdc -> {"type": "deposit_usdc", "params": {"amount": 100}}\n- withdraw 50 USDC -> {"type": "withdraw_usdc", "params": {"amount": 50}}\n- user: withdraw 50 USDC\\nassistant: which account?\\nuser: account abc123 -> {"type": "withdraw_usdc", "params": {"amount": 50, "bankAccountId": "abc123"}}\n- show my bank accounts -> {"type": "get_bank_accounts", "params": {}}\n- what is defi -> {"type": "none", "params": {}}';
 
   try {
     console.log("Calling Gemini API for intent parsing...");
     const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    let text = result.response.text().trim();
     console.log("Gemini response:", text);
+
+    // Remove markdown code blocks if present
+    text = text.replace(/```json\s*/g, "").replace(/```\s*/g, "");
+
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       return JSON.parse(jsonMatch[0]);
@@ -123,13 +137,24 @@ async function executeBankingAction(
         const data = await response.json();
 
         if (data.success) {
-          return (
+          let message =
             "✅ Successfully initiated deposit of " +
             action.params.amount +
             " USDC to your wallet!\n\nTransaction ID: " +
-            (data.transfer?.id || "N/A") +
-            "\n\nThe USDC should appear in your wallet shortly. You can check your balance in the wallet section above."
-          );
+            (data.transfer?.id || "N/A");
+
+          if (data.txHash) {
+            message +=
+              "\n\nTransaction Hash: " +
+              data.txHash +
+              "\nView on BaseScan: https://sepolia.basescan.org/tx/" +
+              data.txHash;
+          }
+
+          message +=
+            "\n\nThe USDC should appear in your wallet shortly. You can check your balance in the wallet section above.";
+
+          return message;
         } else {
           return (
             "❌ Deposit failed: " +
@@ -193,33 +218,63 @@ async function executeBankingAction(
           }
         }
 
-        const response = await fetch(baseUrl + "/api/circle/withdraw", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        return JSON.stringify({
+          type: "TRANSACTION_REQUEST",
+          action: "withdraw_usdc",
+          params: {
             amount: action.params.amount,
             bankAccountId: action.params.bankAccountId,
-            userAddress: walletAddress,
-          }),
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          return (
-            "✅ Successfully initiated withdrawal of " +
+          },
+          message:
+            "Ready to withdraw " +
             action.params.amount +
-            " USDC to your bank account!\n\nPayout ID: " +
-            (data.payout?.id || "N/A") +
-            "\n\nThe funds should arrive in your bank account within 1-2 business days."
-          );
-        } else {
+            " USDC to your bank account. Please approve the transaction in your wallet.",
+        });
+      }
+
+      case "check_balance": {
+        if (!walletAddress) {
+          return "Please connect your wallet first to check your balance.";
+        }
+
+        return (
+          "You can check your wallet balance in the Wallet section at the top of the page.\n\nYour wallet address is:\n" +
+          walletAddress +
+          "\n\nThe wallet section shows your:\n• ETH balance (for gas fees)\n• USDC balance (for transfers)\n\nIf you need test tokens, visit:\n• Coinbase Faucet: https://portal.cdp.coinbase.com/products/faucet\n• Base Sepolia Faucet: https://www.alchemy.com/faucets/base-sepolia"
+        );
+      }
+
+      case "transfer_usdc": {
+        if (!walletAddress) {
+          return "Please connect your wallet first to transfer USDC.";
+        }
+
+        if (!action.params?.amount) {
+          return "I can help you transfer USDC. How much USDC would you like to transfer?";
+        }
+
+        if (!action.params?.recipient_address) {
           return (
-            "❌ Withdrawal failed: " +
-            (data.error || "Unknown error") +
-            ". Please make sure you have sufficient USDC balance."
+            "I can transfer " +
+            action.params.amount +
+            " USDC for you. What's the recipient's wallet address?"
           );
         }
+
+        return JSON.stringify({
+          type: "TRANSACTION_REQUEST",
+          action: "transfer_usdc",
+          params: {
+            amount: action.params.amount,
+            recipient: action.params.recipient_address,
+          },
+          message:
+            "Ready to transfer " +
+            action.params.amount +
+            " USDC to " +
+            action.params.recipient_address +
+            ". Please approve the transaction in your wallet.",
+        });
       }
 
       case "send_usdc": {
@@ -267,9 +322,7 @@ export async function POST(req: Request) {
       throw new Error("GEMINI_API_KEY is required");
     }
 
-    const lastMessage = messages[messages.length - 1]?.content || "";
-
-    const bankingAction = await parseWithAI(lastMessage);
+    const bankingAction = await parseWithAI(messages);
 
     if (bankingAction.type !== "none") {
       const actionResult = await executeBankingAction(
