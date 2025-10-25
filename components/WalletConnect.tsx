@@ -29,17 +29,7 @@ export default function WalletConnect() {
           <div className="mt-4 space-y-3">
             {/* Wallet Info */}
             <div className="flex items-center justify-between">
-              <Identity 
-                address={address}
-                className="flex items-center space-x-2"
-                schemaId="0xf8b05c79f090979bf4a80270aba232dff11a10d9ca55c4f88de95317970f0de9"
-              >
-                <Avatar className="w-8 h-8" />
-                <div>
-                  <Name className="text-sm font-medium" />
-                  <Address className="text-xs text-gray-600" />
-                </div>
-              </Identity>
+            
               
               <div className="flex items-center space-x-2">
                 <Badge variant="secondary" className="bg-green-100 text-green-800">

@@ -21,9 +21,6 @@ export default function Home() {
 
   return (
     <div className={styles.container}>
-      <button className={styles.closeButton} type="button">
-        ✕
-      </button>
 
       <div className={styles.content}>
         <div className={styles.waitlistForm}>
@@ -31,7 +28,7 @@ export default function Home() {
           <div className="text-center mb-6">
             <div className="flex items-center justify-center space-x-2 mb-2">
               <Send className="w-8 h-8 text-blue-600" />
-              <h1 className={styles.title}>
+              <h1 className='text-3xl font-bold'>
                 Flow<span className="text-blue-600">Send</span> AI
               </h1>
             </div>
@@ -41,29 +38,31 @@ export default function Home() {
                 assistant to manage crypto operations on Base.
               </p>
             </div>
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <div className="flex items-center space-x-1 text-green-600">
-                <Zap className="w-4 h-4" />
-                <span className="text-xs font-medium">
-                  Gas Free Transactions
-                </span>
+            <div className="flex justify-between w-full items-center">
+              <div className="flex items-center justify-start space-x-2">
+                <div className="flex items-center space-x-1 text-green-600">
+                  <Zap className="w-4 h-4" />
+                  <span className="text-xs font-medium">
+                    Gas Free Transactions
+                  </span>
+                </div>
               </div>
+              <Badge
+                variant="secondary"
+                className="bg-yellow-100 text-yellow-800"
+              >
+                Base Sepolia Testnet
+              </Badge>
             </div>
-            <Badge
-              variant="secondary"
-              className="bg-yellow-100 text-yellow-800"
-            >
-              Base Sepolia Testnet
-            </Badge>
           </div>
 
           {/* Wallet Connection */}
-          <div className="mb-6">
+          <div className="mb-3">
             <WalletConnect />
           </div>
 
           {/* Dashboard Link */}
-          <div className="mb-6">
+          <div className="mb-3">
             <Link href="/dashboard">
               <Button
                 variant="outline"
