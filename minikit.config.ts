@@ -21,10 +21,9 @@ baseBuilder: {
 miniapp: {
   version: "1",
   name: "flowsend",
-  subtitle: "Gasless Cross-Border Payment Platform",
+  subtitle: "GGasless Global Payments",
   description:
-    "FlowSend enables instant, zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",
-  screenshotUrls: [
+  "FlowSend enables instant zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",  screenshotUrls: [
     `${ROOT_URL}/flowsenLogo.png`,
     `${ROOT_URL}/deposit.png`,
     `${ROOT_URL}/withdraw.png`,
@@ -39,10 +38,9 @@ miniapp: {
   primaryCategory: "utility",
   tags: ["payment", "finance", "cross-border", "crypto", "usdc"],
   heroImageUrl: `${ROOT_URL}/flowsendLogo.png`,
-  tagline: "Send money globally with zero gas fees and instant settlement.",
-  ogTitle: "FlowSend - Instant Gasless Cross-Border Payments",
-  ogDescription:
-    "FlowSend leverages Base blockchain & Circle APIs to make your international transfers instant, transparent, and affordable.",
+  tagline: "Global zero-gas payments",
+  ogTitle: "FlowSend - Gasless Payments",
+  ogDescription: "FlowSend uses Base blockchain and Circle APIs for fast, affordable global transfers.",
   ogImageUrl: `${ROOT_URL}/flowsendLogo.png`,
 },
 } as const;
