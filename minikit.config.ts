@@ -25,7 +25,11 @@ miniapp: {
   description:
     "FlowSend enables instant, zero-gas-fee global money transfers using USDC on Base blockchain with seamless bank on/off ramps powered by Circle API.",
   screenshotUrls: [
-    `${ROOT_URL}/screenshots/flowsenLogo.png`,
+    `${ROOT_URL}/flowsenLogo.png`,
+    `${ROOT_URL}/deposit.png`,
+    `${ROOT_URL}/withdraw.png`,
+    `${ROOT_URL}/transfer.png`,
+    `${ROOT_URL}/dashboard.png`,
   ],
   iconUrl: `${ROOT_URL}/flowsendLogo.png`,
   splashImageUrl: `${ROOT_URL}/flowsendLogo.png`,
