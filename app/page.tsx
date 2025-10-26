@@ -10,14 +10,12 @@ import Link from "next/link";
 import styles from "./page.module.css";
 
 export default function Home() {
-  const { isFrameReady, setFrameReady, context } = useMiniKit();
+  const { setMiniAppReady, isMiniAppReady,context } = useMiniKit();
 
   // Initialize the miniapp
   useEffect(() => {
-    if (!isFrameReady) {
-      setFrameReady();
-    }
-  }, [setFrameReady, isFrameReady]);
+    if (!isMiniAppReady) setMiniAppReady();
+  }, [isMiniAppReady, setMiniAppReady]);
 
   return (
     <div className={styles.container}>
