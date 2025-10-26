@@ -14,12 +14,12 @@ export function useBaseAccount() {
 
   useEffect(() => {
     async function initializeBaseAccount() {
-      // if (!isConnected) {
-      //   setProvider(null);
-      //   setAddress(null);
-      //   setIsInitialized(false);
-      //   return;
-      // }
+      if (!isConnected) {
+        setProvider(null);
+        setAddress(null);
+        setIsInitialized(false);
+        return;
+      }
 
       try {
         console.log('🔄 Initializing Base Account SDK...');
