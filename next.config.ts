@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
     CDP_API_KEY_PRIVATE_KEY: process.env.CDP_API_KEY_PRIVATE_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   },
+  images: {
+    domains: [
+      'payload-marketing.moonpay.com',
+      'encrypted-tbn0.gstatic.com',
+      'storage.googleapis.com',
+      'upload.wikimedia.org',
+    ],
+  },
 };
 
 export default nextConfig;
